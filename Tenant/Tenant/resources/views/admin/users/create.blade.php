@@ -1,0 +1,17 @@
+@php
+    $roleLabel = \App\Enums\UserRole::labels()[auth()->user()->role] ?? 'Tenant Admin';
+@endphp
+<x-layouts.admin :pageTitle="'Create User'" :role="$roleLabel">
+    <x-slot name="breadcrumb">
+        <a href="{{ route('admin.users.index') }}" class="text-slate-500 hover:text-slate-700">Users</a>
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        <span class="text-slate-600">Create</span>
+    </x-slot>
+
+    <div class="mx-auto w-full max-w-3xl rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+        <form method="POST" action="{{ route('admin.users.store') }}" class="space-y-5">
+            @csrf
+            @include('admin.users.partials.form', ['userModel' => null])
+        </form>
+    </div>
+</x-layouts.admin>
