@@ -22,3 +22,6 @@ EduProfile is a multi-tenant school profiling and student status monitoring syst
 5. Configure the database
 6. Run `php artisan migrate`
 7. Run `php artisan serve`
+
+## Release Workflow
+- See `RELEASE_WORKFLOW.md` for support ticket/update module usage, GitHub release connection strategy, and team release process.
