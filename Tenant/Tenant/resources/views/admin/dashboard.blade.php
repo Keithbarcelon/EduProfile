@@ -13,13 +13,13 @@
     </x-slot>
 
     <div class="mx-auto w-full max-w-7xl space-y-6">
-    <section class="admin-soft-ring rounded-3xl bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 px-6 py-6 text-white sm:px-8 shadow-xl shadow-indigo-900/20">
-        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-100">Tenant Overview</p>
+    <section class="tenant-hero admin-soft-ring rounded-3xl px-6 py-6 text-white sm:px-8 shadow-xl shadow-indigo-900/20">
+        <p class="tenant-hero-kicker text-xs font-semibold uppercase tracking-[0.2em]">Tenant Overview</p>
         <h2 class="admin-display mt-2 text-2xl font-bold">{{ $roleLabel }} Dashboard</h2>
-        <p class="mt-2 max-w-2xl text-sm text-indigo-100">Monitor enrollment trends, check recent records, and manage student data from one focused workspace.</p>
+        <p class="tenant-hero-body mt-2 max-w-2xl text-sm">Monitor enrollment trends, check recent records, and manage student data from one focused workspace.</p>
     </section>
 
-    @if($hasFullDashboardAccess)
+    @if($hasFullDashboardAccess && ($widgetVisibility['overview_cards'] ?? true))
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div class="admin-panel rounded-2xl bg-white p-5 shadow-sm border border-slate-100">
             <p class="text-xs uppercase font-bold tracking-wider text-slate-400">Total Students</p>
@@ -31,7 +31,7 @@
         </div>
         <div class="admin-panel rounded-2xl bg-white p-5 shadow-sm border border-slate-100">
             <p class="text-xs uppercase font-bold tracking-wider text-slate-400">Total Users</p>
-            <p class="mt-2 text-2xl font-bold text-indigo-600">{{ number_format($totalUsers) }}</p>
+            <p class="tenant-primary-text mt-2 text-2xl font-bold">{{ number_format($totalUsers) }}</p>
         </div>
         <div class="admin-panel rounded-2xl bg-white p-5 shadow-sm border border-slate-100">
             <p class="text-xs uppercase font-bold tracking-wider text-slate-400">Missing Submissions</p>
@@ -39,8 +39,8 @@
         </div>
     </div>
     @else
-    <div class="admin-panel rounded-2xl bg-indigo-50/50 p-6 border border-indigo-100/50">
-        <p class="text-sm font-medium text-indigo-700 italic">"Focus on your assigned tasks. Limited overview mode active."</p>
+    <div class="tenant-soft-panel admin-panel rounded-2xl border p-6">
+        <p class="tenant-soft-text text-sm font-medium italic">"Focus on your assigned tasks. Limited overview mode active."</p>
     </div>
     @endif
 
@@ -49,7 +49,7 @@
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Recent Students</h3>
                 @can('viewAny', App\Models\Student::class)
-                <a href="{{ route('admin.students.index') }}" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider">View all</a>
+                <a href="{{ route('admin.students.index') }}" class="tenant-link text-xs font-bold uppercase tracking-wider">View all</a>
                 @endcan
             </div>
 
@@ -86,6 +86,7 @@
         </div>
 
         <div class="space-y-6">
+            @if($widgetVisibility['status_overview'] ?? true)
             <div class="admin-panel rounded-2xl bg-white p-5 shadow-sm border border-slate-100">
                 <div class="flex items-center justify-between">
                     <h3 class="text-sm font-bold uppercase tracking-wide text-slate-800">Status Overview</h3>
@@ -102,7 +103,9 @@
                     @endforeach
                 </div>
             </div>
+            @endif
 
+            @if($widgetVisibility['document_queue'] ?? true)
             <div class="admin-panel rounded-2xl bg-white p-5 shadow-sm border border-slate-100">
                 <h3 class="text-sm font-bold uppercase tracking-wide text-slate-800">Document Queue</h3>
                 <div class="mt-4 grid grid-cols-1 gap-3">
@@ -113,10 +116,11 @@
                     </div>
                     @endforeach
                 </div>
-                <div class="mt-4 rounded-xl bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
+                <div class="tenant-soft-panel tenant-soft-text mt-4 rounded-xl border px-4 py-3 text-sm">
                     {{ number_format($totalDepartments) }} departments are active in this tenant.
                 </div>
             </div>
+            @endif
         </div>
     </div>
     </div>

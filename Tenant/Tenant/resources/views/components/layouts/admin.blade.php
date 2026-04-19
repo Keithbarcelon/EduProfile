@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ $title ?? config('app.name', 'EduProfile') }} — Admin</title>
+    @php
+        $tenantSchool = app('currentSchool');
+        $tenantSchoolName = trim((string) ($tenantSchool->name ?? config('app.name', 'Tenant Portal')));
+    @endphp
+    <title>{{ $title ?? $tenantSchoolName }} — Admin</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -13,8 +17,113 @@
 
     <!-- Scripts & Styles -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+    @php
+        $brandPrimary = \App\Support\TenantConfig::setting('branding.primary_color', '#4f46e5') ?: '#4f46e5';
+        $brandAccent = \App\Support\TenantConfig::setting('branding.accent_color', '#0891b2') ?: '#0891b2';
+    @endphp
+
+    <style>
+        :root {
+            --tenant-primary: {{ $brandPrimary }};
+            --tenant-accent: {{ $brandAccent }};
+            --tenant-primary-soft: color-mix(in srgb, var(--tenant-primary) 15%, white);
+            --tenant-primary-strong: color-mix(in srgb, var(--tenant-primary) 88%, black);
+            --tenant-accent-soft: color-mix(in srgb, var(--tenant-accent) 18%, white);
+        }
+
+        .tenant-primary-bg {
+            background-color: var(--tenant-primary) !important;
+        }
+
+        .tenant-primary-text {
+            color: var(--tenant-primary) !important;
+        }
+
+        .tenant-primary-btn {
+            background-color: var(--tenant-primary);
+            color: #fff;
+        }
+
+        .tenant-primary-btn:hover {
+            background-color: var(--tenant-primary-strong);
+        }
+
+        .tenant-primary-soft-bg {
+            background-color: var(--tenant-primary-soft);
+        }
+
+        .tenant-hero {
+            background: linear-gradient(90deg, color-mix(in srgb, var(--tenant-primary) 78%, black), color-mix(in srgb, var(--tenant-primary) 58%, var(--tenant-accent)), color-mix(in srgb, var(--tenant-accent) 78%, black));
+        }
+
+        .tenant-hero-kicker {
+            color: color-mix(in srgb, white 78%, var(--tenant-primary));
+        }
+
+        .tenant-hero-body {
+            color: color-mix(in srgb, white 72%, var(--tenant-accent));
+        }
+
+        .tenant-link {
+            color: var(--tenant-primary);
+        }
+
+        .tenant-link:hover {
+            color: var(--tenant-primary-strong);
+        }
+
+        .tenant-soft-panel {
+            background-color: var(--tenant-primary-soft);
+            border-color: color-mix(in srgb, var(--tenant-primary) 30%, white);
+        }
+
+        .tenant-soft-text {
+            color: color-mix(in srgb, var(--tenant-primary) 78%, black);
+        }
+
+        .tenant-focus-ring:focus {
+            border-color: var(--tenant-primary) !important;
+            box-shadow: 0 0 0 1px var(--tenant-primary) !important;
+            outline: none;
+        }
+
+        .tenant-file-input::file-selector-button {
+            margin-right: 1rem;
+            border-radius: 0.75rem;
+            border: 0;
+            background-color: var(--tenant-primary);
+            color: #fff;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .tenant-file-input:hover::file-selector-button {
+            background-color: var(--tenant-primary-strong);
+        }
+
+        .tenant-accent-bg {
+            background-color: color-mix(in srgb, var(--tenant-accent) 85%, white);
+        }
+
+        .tenant-sidebar {
+            background: linear-gradient(180deg, color-mix(in srgb, var(--tenant-primary) 72%, black), color-mix(in srgb, var(--tenant-primary) 58%, black) 55%, color-mix(in srgb, var(--tenant-accent) 62%, black));
+        }
+
+        .tenant-nav-active {
+            background-color: var(--tenant-primary);
+            color: #fff;
+        }
+
+        .tenant-nav-hover:hover {
+            background-color: color-mix(in srgb, var(--tenant-primary) 65%, black);
+            color: #fff;
+        }
+    </style>
 </head>
-<body class="admin-shell antialiased bg-slate-100 text-slate-900">
+<body class="admin-shell antialiased bg-slate-100 text-slate-900" style="--tenant-primary: {{ $brandPrimary }}; --tenant-accent: {{ $brandAccent }};">
 
 <div class="relative flex min-h-screen overflow-hidden">
     <div class="pointer-events-none absolute inset-0">
@@ -27,17 +136,29 @@
         <div id="sidebarBackdrop" class="fixed inset-0 z-30 hidden bg-slate-900/40 lg:hidden"></div>
 
         <aside id="sidebar"
-            class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col bg-gradient-to-b from-indigo-900 via-indigo-900 to-indigo-950 text-white shadow-2xl transition-transform duration-300 ease-out lg:static lg:z-auto lg:translate-x-0 lg:shadow-none">
+            class="tenant-sidebar fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col text-white shadow-2xl transition-transform duration-300 ease-out lg:static lg:z-auto lg:translate-x-0 lg:shadow-none">
 
         {{-- Logo --}}
+        @php
+            $currentSchool = app('currentSchool');
+            $hasTenantLogo = $currentSchool && filled($currentSchool->logo_path);
+        @endphp
         <div class="flex items-center gap-3 border-b border-indigo-800/80 px-6 py-5">
-            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500 shadow shadow-indigo-500/30">
+            @if($hasTenantLogo)
+            <img
+                src="{{ route('tenant.logo', ['v' => optional($currentSchool->updated_at)->timestamp]) }}"
+                alt="{{ $currentSchool->name }} logo"
+                class="h-9 w-9 rounded-lg border border-indigo-300/30 bg-white object-contain p-0.5 shadow shadow-indigo-500/30"
+            >
+            @else
+            <div class="tenant-primary-bg flex h-9 w-9 items-center justify-center rounded-lg shadow shadow-indigo-500/30">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round"
                           d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0-6l6.16-3.422A12.083 12.083 0 0121 12c0 3.866-4.03 7-9 7s-9-3.134-9-7a12.08 12.08 0 012.84-7.422L12 14z"/>
                 </svg>
             </div>
-            <span class="admin-display text-lg font-bold tracking-wide">EduProfile</span>
+            @endif
+            <span class="admin-display text-sm font-bold tracking-wide uppercase">{{ $tenantSchoolName }}</span>
         </div>
 
         {{-- Role Badge --}}
@@ -52,6 +173,7 @@
 
             @php
                 $user = auth()->user();
+                $customization = app(\App\Services\TenantCustomizationService::class);
                 $userRole = strtolower($user?->role ?? 'student');
                 if ($userRole === 'admin') {
                     $userRole = 'tenant_admin';
@@ -62,18 +184,22 @@
                 if (in_array($userRole, $staffRoles, true)) {
                     $items = [
                         ['label' => 'Dashboard', 'route' => 'admin.dashboard', 'icon' => 'home'],
-                        ['label' => 'Students', 'route' => 'admin.students.index', 'icon' => 'users', 'permission' => 'manage_students'],
-                        ['label' => 'Status Monitoring', 'route' => 'admin.status-updates.index', 'icon' => 'clipboard-list', 'permission' => 'manage_status_updates'],
-                        ['label' => 'Document Reviews', 'route' => 'admin.documents.index', 'icon' => 'book-open', 'permission' => 'review_documents'],
-                        ['label' => 'Reports', 'route' => 'admin.reports.index', 'icon' => 'chart-bar', 'permission' => 'view_reports'],
-                        ['label' => 'Users', 'route' => 'admin.users.index', 'icon' => 'user-group', 'permission' => 'manage_users'],
-                        ['label' => 'Roles', 'route' => 'admin.roles.index', 'icon' => 'shield-check', 'permission' => 'manage_roles'],
-                        ['label' => 'Role Assignments', 'route' => 'admin.role-assignments.index', 'icon' => 'user-group', 'permission' => 'manage_roles'],
-                        ['label' => 'Departments', 'route' => 'admin.departments.index', 'icon' => 'office-building', 'permission' => 'manage_departments'],
-                        ['label' => 'Settings', 'route' => 'admin.settings.index', 'icon' => 'cog', 'permission' => 'manage_settings'],
+                        ['label' => 'Students', 'route' => 'admin.students.index', 'icon' => 'users', 'permission' => 'manage_students', 'module' => 'students'],
+                        ['label' => 'Status Monitoring', 'route' => 'admin.status-updates.index', 'icon' => 'clipboard-list', 'permission' => 'manage_status_updates', 'module' => 'status_monitoring'],
+                        ['label' => 'Document Reviews', 'route' => 'admin.documents.index', 'icon' => 'book-open', 'permission' => 'review_documents', 'module' => 'documents'],
+                        ['label' => 'Reports', 'route' => 'admin.reports.index', 'icon' => 'chart-bar', 'permission' => 'view_reports', 'module' => 'reports'],
+                        ['label' => 'Users', 'route' => 'admin.users.index', 'icon' => 'user-group', 'permission' => 'manage_users', 'module' => 'users'],
+                        ['label' => 'Roles', 'route' => 'admin.roles.index', 'icon' => 'shield-check', 'permission' => 'manage_roles', 'module' => 'roles'],
+                        ['label' => 'Role Assignments', 'route' => 'admin.role-assignments.index', 'icon' => 'user-group', 'permission' => 'manage_roles', 'module' => 'roles'],
+                        ['label' => 'Departments', 'route' => 'admin.departments.index', 'icon' => 'office-building', 'permission' => 'manage_departments', 'module' => 'departments'],
+                        ['label' => 'Settings', 'route' => 'admin.settings.index', 'icon' => 'cog', 'permission' => 'manage_settings', 'module' => 'settings'],
                     ];
 
-                    $items = array_values(array_filter($items, function (array $item) use ($user): bool {
+                    $items = array_values(array_filter($items, function (array $item) use ($user, $customization): bool {
+                        if (isset($item['module']) && ! $customization->moduleEnabled((string) $item['module'], true)) {
+                            return false;
+                        }
+
                         if (! isset($item['permission'])) {
                             return true;
                         }
@@ -83,9 +209,17 @@
                 } else {
                     $items = [
                         ['label' => 'Dashboard', 'route' => 'student.dashboard', 'icon' => 'home'],
-                        ['label' => 'My Documents', 'route' => 'student.documents.index', 'icon' => 'book-open'],
-                        ['label' => 'Profile', 'route' => 'profile.edit', 'icon' => 'user'],
+                        ['label' => 'My Documents', 'route' => 'student.documents.index', 'icon' => 'book-open', 'module' => 'documents'],
+                        ['label' => 'Settings', 'route' => 'settings.edit', 'icon' => 'cog'],
                     ];
+
+                    $items = array_values(array_filter($items, function (array $item) use ($customization): bool {
+                        if (! isset($item['module'])) {
+                            return true;
+                        }
+
+                        return $customization->moduleEnabled((string) $item['module'], true);
+                    }));
                 }
             @endphp
 
@@ -95,10 +229,10 @@
                 @endphp
                 @if(Route::has($item['route']))
                 <a href="{{ route($item['route']) }}"
-                   class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all
+                   class="tenant-nav-hover group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all
                           {{ $isActive
-                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-950/40'
-                              : 'text-indigo-100/90 hover:bg-indigo-800/80 hover:text-white' }}">
+                              ? 'tenant-nav-active text-white shadow-md shadow-indigo-950/40'
+                              : 'text-indigo-100/90' }}">
                     <x-admin-nav-icon :icon="$item['icon']" class="w-5 h-5 shrink-0" />
                     {{ $item['label'] }}
                 </a>
@@ -117,20 +251,24 @@
                 $appVersion = (string) config('app.version', 'v1.0.0');
                 $releaseUrl = trim((string) config('app.release.github_url', ''));
                 $supportUrl = trim((string) config('app.release.support_url', ''));
+                $supportPageUrl = Route::has('support-updates.index') ? route('support-updates.index') : '';
                 $updatesLabel = (string) config('app.release.updates_label', 'Support & Updates');
             @endphp
 
-            <div class="mb-3 rounded-lg border border-indigo-800/70 bg-indigo-900/40 px-3 py-2">
-                <p class="text-[10px] uppercase tracking-wider text-indigo-300">Application Version</p>
-                <p class="mt-0.5 text-sm font-semibold text-white">{{ $appVersion }}</p>
-                <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+            <div class="mb-3 text-[11px] text-indigo-200/85">
+                <p class="text-[10px] uppercase tracking-wide text-indigo-300/75">Version {{ $appVersion }}</p>
+                <div class="mt-1 flex flex-wrap items-center gap-3">
                     @if($releaseUrl !== '')
-                        <a href="{{ $releaseUrl }}" target="_blank" rel="noopener noreferrer" class="rounded-md border border-indigo-700/70 px-2 py-1 text-indigo-200 hover:bg-indigo-800/70 hover:text-white">
+                        <a href="{{ $releaseUrl }}" target="_blank" rel="noopener noreferrer" class="text-indigo-200/80 hover:text-indigo-100">
                             Release GitHub
                         </a>
                     @endif
-                    @if($supportUrl !== '')
-                        <a href="{{ $supportUrl }}" target="_blank" rel="noopener noreferrer" class="rounded-md border border-indigo-700/70 px-2 py-1 text-indigo-200 hover:bg-indigo-800/70 hover:text-white">
+                    @if($supportPageUrl !== '')
+                        <a href="{{ $supportPageUrl }}" class="rounded-md px-1.5 text-indigo-200/85 hover:bg-indigo-700/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/80">
+                            {{ $updatesLabel }}
+                        </a>
+                    @elseif($supportUrl !== '')
+                        <a href="{{ $supportUrl }}" target="_blank" rel="noopener noreferrer" class="text-indigo-200/80 hover:text-indigo-100">
                             {{ $updatesLabel }}
                         </a>
                     @endif
@@ -138,7 +276,7 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <div class="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500 text-white text-sm font-bold shrink-0">
+                <div class="tenant-primary-bg flex items-center justify-center w-8 h-8 rounded-full text-white text-sm font-bold shrink-0">
                     {{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 1)) }}
                 </div>
                 <div class="flex-1 min-w-0">
@@ -207,7 +345,7 @@
                 <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open"
                             class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-100">
-                        <div class="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+                        <div class="tenant-primary-bg w-7 h-7 rounded-full text-white flex items-center justify-center text-xs font-bold">
                             {{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 1)) }}
                         </div>
                         <span class="font-medium">{{ auth()->user()->name ?? 'Admin' }}</span>
@@ -247,7 +385,7 @@
         {{-- ===================== CONTENT ===================== --}}
         <main class="relative z-10 flex-1 overflow-y-auto p-4 sm:p-6">
             {{-- Flash Messages --}}
-            @if(session('success'))
+            @if(!($suppressFlash ?? false) && session('success'))
             <div class="mb-4 flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
                 <svg class="w-5 h-5 text-green-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -256,7 +394,7 @@
             </div>
             @endif
 
-            @if(session('error'))
+            @if(!($suppressFlash ?? false) && session('error'))
             <div class="mb-4 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                 <svg class="w-5 h-5 text-red-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>

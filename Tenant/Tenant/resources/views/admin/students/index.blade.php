@@ -9,10 +9,10 @@
     </x-slot>
 
     <div class="mx-auto w-full max-w-7xl space-y-6">
-    <section class="admin-soft-ring rounded-3xl bg-gradient-to-r from-sky-600 via-cyan-600 to-emerald-600 px-6 py-6 text-white sm:px-8">
-        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-100">Student Registry</p>
+    <section class="tenant-hero admin-soft-ring rounded-3xl px-6 py-6 text-white sm:px-8">
+        <p class="tenant-hero-kicker text-xs font-semibold uppercase tracking-[0.2em]">Student Registry</p>
         <h2 class="admin-display mt-2 text-2xl font-bold">Manage Enrollees</h2>
-        <p class="mt-2 max-w-2xl text-sm text-cyan-100">Search, filter, and maintain student records with quick actions and live enrollment summaries.</p>
+        <p class="tenant-hero-body mt-2 max-w-2xl text-sm">Search, filter, and maintain student records with quick actions and live enrollment summaries.</p>
     </section>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -44,7 +44,7 @@
                     <p class="mt-1 text-xs text-slate-500">Create student users in User Management, then link them here and finalize profile details in edit.</p>
                 </div>
                 @if(auth()->user()?->hasPermission('manage_users'))
-                    <a href="{{ route('admin.users.create') }}" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700">
+                    <a href="{{ route('admin.users.create') }}" class="tenant-primary-btn inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors">
                         Create Student User
                     </a>
                 @endif
@@ -107,10 +107,10 @@
                        name="search"
                        value="{{ request('search') }}"
                        placeholder="Search name, ID, email…"
-                     class="min-w-[180px] flex-1 rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                     class="tenant-focus-ring min-w-[180px] flex-1 rounded-lg border-slate-300 px-3 py-2 text-sm">
                 
                 <select name="department_id"
-                    class="rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    class="tenant-focus-ring rounded-lg border-slate-300 px-3 py-2 text-sm">
                     <option value="">All Departments</option>
                     @foreach($departments as $dept)
                         <option value="{{ $dept->id }}" @selected(request('department_id') == $dept->id)>{{ $dept->name }}</option>
@@ -118,7 +118,7 @@
                 </select>
 
                 <select name="status_category"
-                    class="rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    class="tenant-focus-ring rounded-lg border-slate-300 px-3 py-2 text-sm">
                     <option value="">All Categories</option>
                     <option value="regular"     @selected(request('status_category') === 'regular')>Regular</option>
                     <option value="affirmative" @selected(request('status_category') === 'affirmative')>Affirmative</option>
@@ -126,7 +126,7 @@
                 </select>
 
                 <button type="submit"
-                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition-colors">
+                    class="tenant-primary-btn px-4 py-2 text-sm rounded-lg transition-colors">
                     Filter
                 </button>
                 @if(request()->hasAny(['search','department_id','status_category']))
@@ -155,7 +155,7 @@
                         <tr class="transition-colors hover:bg-slate-50">
                             <td class="px-6 py-3">
                                 <div class="flex items-center gap-3">
-                                    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+                                    <div class="tenant-primary-soft-bg tenant-primary-text flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
                                         {{ strtoupper(substr($student->first_name, 0, 1) . substr($student->last_name, 0, 1)) }}
                                     </div>
                                     <div>
@@ -199,7 +199,7 @@
                             <td class="px-6 py-3 text-right">
                                 <div class="flex items-center justify-end gap-2">
                                     <a href="{{ route('admin.students.show', $student) }}"
-                                                    class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-indigo-50 hover:text-indigo-600"
+                                                    class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 tenant-link"
                                        title="View">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>

@@ -57,7 +57,7 @@ return [
     'version' => env('APP_VERSION', 'v1.0.0'),
 
     'release' => [
-        'github_url' => env('APP_RELEASE_GITHUB', 'https://github.com/your-org/eduprofile/releases'),
+        'github_url' => env('APP_RELEASE_GITHUB', 'https://github.com/Keithbarcelon/EduProfile/releases/tag/v1.0.0'),
         'support_url' => env('APP_SUPPORT_URL', 'mailto:support@eduprofile.local'),
         'updates_label' => env('APP_UPDATES_LABEL', 'Support & Updates'),
     ],

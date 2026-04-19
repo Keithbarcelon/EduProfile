@@ -19,7 +19,16 @@ class StatusUpdate extends Model
         'new_status',
         'remarks',
         'approval_status',
+        'workflow_key',
+        'workflow_step_order',
+        'required_role_slug',
+        'approval_audit',
         'approved_by',
+    ];
+
+    protected $casts = [
+        'workflow_step_order' => 'integer',
+        'approval_audit' => 'array',
     ];
 
     /**

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ app('currentSchool')->name }} | EduProfile</title>
+    <title>{{ app('currentSchool')->name }} | Tenant Portal</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=outfit:600,700,800|plus-jakarta-sans:400,500,600,700&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -47,11 +47,22 @@
             <header class="border-b border-slate-300/80 bg-white/90 backdrop-blur">
                 <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
                     <a href="#home" class="flex min-w-0 items-center gap-4">
+                        @php
+                            $hasTenantLogo = filled($school->logo_path);
+                        @endphp
+                        @if($hasTenantLogo)
+                        <img
+                            src="{{ route('tenant.logo', ['v' => optional($school->updated_at)->timestamp]) }}"
+                            alt="{{ $school->name }} logo"
+                            class="h-12 w-12 shrink-0 rounded-sm border border-slate-300 bg-white object-contain p-1 shadow-lg shadow-slate-900/15"
+                        >
+                        @else
                         <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm border border-slate-800 bg-slate-950 text-sm font-extrabold uppercase tracking-[0.2em] text-white shadow-lg shadow-slate-900/15">
                             {{ strtoupper(substr($school->name, 0, 1)) }}
                         </div>
+                        @endif
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-500">EduProfile</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-500">{{ $school->name }}</p>
                             <h1 class="truncate text-base font-bold uppercase text-slate-950 sm:text-lg" style="font-family: 'Outfit', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;">
                                 {{ $school->name }}
                             </h1>
@@ -190,7 +201,7 @@
                 <section id="about" class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
                     <div class="grid gap-6 lg:grid-cols-[0.7fr_1.3fr]">
                         <article class="border border-slate-300 bg-white p-7 shadow-sm sm:p-8">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">About EduProfile</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">About {{ $school->name }}</p>
                             <h3 class="mt-4 text-3xl font-black uppercase leading-tight text-slate-950" style="font-family: 'Outfit', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;">
                                 Professional academic monitoring for modern schools
                             </h3>
@@ -198,7 +209,7 @@
 
                         <article class="border border-slate-800 bg-slate-900 p-7 text-slate-200 shadow-[0_18px_48px_rgba(15,23,42,0.16)] sm:p-8">
                             <p class="text-base leading-8">
-                                EduProfile gives <span class="font-semibold text-white">{{ $school->name }}</span> a structured environment for student profiling, status monitoring, and document management. The system is designed to strengthen efficiency, improve monitoring discipline, and support academic teams with clearer operational visibility and timely intervention data.
+                                <span class="font-semibold text-white">{{ $school->name }}</span> uses a structured environment for student profiling, status monitoring, and document management. The system is designed to strengthen efficiency, improve monitoring discipline, and support academic teams with clearer operational visibility and timely intervention data.
                             </p>
                         </article>
                     </div>
@@ -208,7 +219,7 @@
             <footer class="border-t border-slate-300 bg-white/90">
                 <div class="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-6 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
                     <p class="font-bold uppercase tracking-[0.14em] text-slate-900">{{ $school->name }}</p>
-                    <p>&copy; {{ now()->year }} {{ $school->name }}. EduProfile Tenant Portal.</p>
+                    <p>&copy; {{ now()->year }} {{ $school->name }}. {{ $school->name }} Tenant Portal.</p>
                 </div>
             </footer>
         </div>

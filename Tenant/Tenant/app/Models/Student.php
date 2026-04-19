@@ -34,6 +34,7 @@ class Student extends Model
         'emergency_contact_number',
         'status',
         'status_category',
+        'custom_fields',
         'enrolled_at',
     ];
 
@@ -44,6 +45,7 @@ class Student extends Model
         'birthdate'   => 'date',
         'enrolled_at' => 'date',
         'year_level'  => 'integer',
+        'custom_fields' => 'array',
     ];
 
     /**
@@ -84,6 +86,33 @@ class Student extends Model
     public function statusUpdates(): HasMany
     {
         return $this->hasMany(StatusUpdate::class);
+    }
+
+    public function customFieldValues(): HasMany
+    {
+        return $this->hasMany(StudentCustomFieldValue::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function customFieldValueMap(): array
+    {
+        $legacy = collect((array) ($this->custom_fields ?? []))
+            ->mapWithKeys(fn ($value, $key) => [(string) $key => (string) $value]);
+
+        if ($this->relationLoaded('customFieldValues')) {
+            $dynamic = $this->customFieldValues
+                ->mapWithKeys(fn (StudentCustomFieldValue $value) => [
+                    (string) $value->field_key => (string) ($value->field_value ?? ''),
+                ]);
+
+            return $legacy
+                ->merge($dynamic)
+                ->all();
+        }
+
+        return $legacy->all();
     }
 
     public function getFullNameAttribute(): string

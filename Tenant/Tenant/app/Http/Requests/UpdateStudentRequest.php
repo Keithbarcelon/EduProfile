@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\UserRole;
+use App\Support\TenantConfig;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -26,8 +27,9 @@ class UpdateStudentRequest extends FormRequest
     {
         $studentId = $this->route('student')?->id;
         $schoolId = (int) app('currentSchool')->id;
+        $statusCategory = strtolower((string) ($this->input('status_category') ?: $this->route('student')?->status_category ?: 'regular'));
 
-        return [
+        $rules = [
             'student_id' => ['required', 'string', 'max:20', Rule::unique('students', 'student_id')->ignore($studentId)],
             'user_id' => [
                 'nullable',
@@ -61,6 +63,49 @@ class UpdateStudentRequest extends FormRequest
             'status' => ['required', 'in:active,inactive,graduated,dropped'],
             'status_category' => ['nullable', 'in:affirmative,probation,regular'],
             'enrolled_at' => ['nullable', 'date'],
+            'custom_fields' => ['nullable', 'array'],
         ];
+
+        foreach (TenantConfig::studentCustomFields() as $field) {
+            $fieldKey = (string) ($field['field_key'] ?? '');
+
+            if ($fieldKey === '') {
+                continue;
+            }
+
+            $type = (string) ($field['field_type'] ?? 'text');
+            $isRequired = (bool) ($field['is_required'] ?? false);
+            $visibleStatuses = collect((array) ($field['visible_statuses'] ?? []))
+                ->map(fn ($value) => strtolower(trim((string) $value)))
+                ->filter()
+                ->values()
+                ->all();
+            $options = collect((array) ($field['options'] ?? []))
+                ->map(fn ($value) => trim((string) $value))
+                ->filter()
+                ->values()
+                ->all();
+
+            $isVisibleForStatus = $visibleStatuses === [] || in_array($statusCategory, $visibleStatuses, true);
+
+            $fieldRules = [$isVisibleForStatus && $isRequired ? 'required' : 'nullable'];
+
+            if ($type === 'number') {
+                $fieldRules[] = 'numeric';
+            } elseif ($type === 'date') {
+                $fieldRules[] = 'date';
+            } else {
+                $fieldRules[] = 'string';
+                $fieldRules[] = 'max:1000';
+            }
+
+            if ($type === 'select' && $options !== []) {
+                $fieldRules[] = Rule::in($options);
+            }
+
+            $rules['custom_fields.' . $fieldKey] = $fieldRules;
+        }
+
+        return $rules;
     }
 }

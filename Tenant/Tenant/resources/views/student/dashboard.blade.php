@@ -19,11 +19,23 @@
     @endphp
 
     <div class="mx-auto w-full max-w-7xl space-y-6">
+        @if(session('success'))
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        @if($errors->any())
+            <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                Please review the highlighted fields and try again.
+            </div>
+        @endif
+
         <section class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white px-6 py-8 shadow-sm sm:px-8">
-            <div class="absolute inset-y-0 right-0 hidden w-1/3 bg-gradient-to-l from-indigo-50 to-transparent lg:block"></div>
+            <div class="tenant-primary-soft-bg absolute inset-y-0 right-0 hidden w-1/3 bg-gradient-to-l to-transparent lg:block"></div>
             <div class="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                 <div class="max-w-3xl">
-                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-600">Student Overview</p>
+                    <p class="tenant-primary-text text-xs font-semibold uppercase tracking-[0.24em]">Student Overview</p>
                     <h2 class="admin-display mt-3 text-3xl font-bold text-slate-900">{{ $student->full_name }}</h2>
                     <div class="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-600">
                         <span>{{ $student->course }}</span>
@@ -99,7 +111,7 @@
 
                 <div class="mt-6 space-y-3">
                     @forelse ($notifications as $notification)
-                        <div class="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+                        <div class="tenant-soft-panel tenant-soft-text rounded-2xl border px-4 py-3 text-sm">
                             {{ $notification }}
                         </div>
                     @empty
@@ -159,6 +171,20 @@
                                     @if ($statusUpdate->remarks)
                                         <p class="mt-3 text-sm text-slate-700">{{ $statusUpdate->remarks }}</p>
                                     @endif
+
+                                    @if(!empty($statusUpdate->approval_audit))
+                                        <div class="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Approval Timeline</p>
+                                            <div class="mt-2 space-y-1">
+                                                @foreach((array) $statusUpdate->approval_audit as $audit)
+                                                    <p class="text-[11px] text-slate-600">
+                                                        <span class="font-semibold">{{ str((string) ($audit['action'] ?? 'event'))->replace('_', ' ')->title() }}</span>
+                                                        · {{ \Illuminate\Support\Carbon::parse((string) ($audit['at'] ?? now()))->format('M d, Y h:i A') }}
+                                                    </p>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endif
                                 </div>
                             @empty
                                 <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
@@ -191,50 +217,66 @@
 
             <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h3 class="text-lg font-semibold text-slate-900">Upload Documents</h3>
-                <p class="mt-1 text-sm text-slate-500">Submit PDF or image files for review.</p>
+                <p class="mt-1 text-sm text-slate-500">Submit one or multiple files for review (for example, front and back images).</p>
 
                 <form method="POST" action="{{ route('student.documents.store') }}" enctype="multipart/form-data" class="mt-6 space-y-4">
                     @csrf
 
                     <div>
                         <label for="name" class="mb-2 block text-sm font-medium text-slate-700">Document Name</label>
-                        <select
-                            id="name"
-                            name="name"
-                            required
-                            class="w-full rounded-2xl border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        >
-                            <option value="">Select required document</option>
-                            @foreach ($requiredDocumentNames as $requiredDocumentName)
-                                <option value="{{ $requiredDocumentName }}" @selected(old('name') === $requiredDocumentName)>
-                                    {{ $requiredDocumentName }}
-                                </option>
-                            @endforeach
-                        </select>
+                        @if($requiredDocumentNames->isNotEmpty())
+                            <select
+                                id="name"
+                                name="name"
+                                required
+                                class="tenant-focus-ring w-full rounded-2xl border-slate-300 text-sm shadow-sm"
+                            >
+                                <option value="">Select required document</option>
+                                @foreach ($requiredDocumentNames as $requiredDocumentName)
+                                    <option value="{{ $requiredDocumentName }}" @selected(old('name') === $requiredDocumentName)>
+                                        {{ $requiredDocumentName }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        @else
+                            <input
+                                id="name"
+                                name="name"
+                                type="text"
+                                value="{{ old('name') }}"
+                                placeholder="e.g. Birth Certificate"
+                                required
+                                class="tenant-focus-ring w-full rounded-2xl border-slate-300 text-sm shadow-sm"
+                            >
+                        @endif
                         @error('name')
                             <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
                         @enderror
                     </div>
 
                     <div>
-                        <label for="file" class="mb-2 block text-sm font-medium text-slate-700">File</label>
+                        <label for="file" class="mb-2 block text-sm font-medium text-slate-700">File(s)</label>
                         <input
                             id="file"
                             type="file"
-                            name="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
+                            name="file[]"
+                            multiple
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                             required
-                            class="block w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700 file:mr-4 file:rounded-xl file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-700"
+                            class="tenant-file-input block w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700"
                         >
-                        <p class="mt-2 text-xs text-slate-500">Allowed files: PDF, JPG, JPEG, PNG. Maximum size: 10MB.</p>
+                        <p class="mt-2 text-xs text-slate-500">Allowed files: PDF, DOC, DOCX, JPG, JPEG, PNG. Maximum size: 10MB each.</p>
                         @error('file')
+                            <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
+                        @enderror
+                        @error('file.*')
                             <p class="mt-2 text-sm text-rose-600">{{ $message }}</p>
                         @enderror
                     </div>
 
                     <button
                         type="submit"
-                        class="inline-flex w-full items-center justify-center rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                        class="tenant-primary-btn inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition"
                     >
                         Upload Document
                     </button>
@@ -268,7 +310,7 @@
                     <tbody class="divide-y divide-slate-100 bg-white">
                         @forelse ($documents as $document)
                             <tr>
-                                <td class="px-4 py-4 font-medium text-slate-900">{{ $document->name }}</td>
+                                <td class="px-4 py-4 font-medium text-slate-900">{{ $documentDisplayNames[$document->id] ?? $document->name }}</td>
                                 <td class="px-4 py-4 text-slate-600">{{ $document->created_at->format('M d, Y h:i A') }}</td>
                                 <td class="px-4 py-4">
                                     <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold uppercase ring-1 {{ $documentBadgeClasses[$document->status] ?? 'bg-slate-100 text-slate-700 ring-slate-200' }}">

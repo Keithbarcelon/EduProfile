@@ -21,8 +21,8 @@
                     <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by name or email" class="min-w-[220px] flex-1 rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
                     <select name="role" class="rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
                         <option value="">All roles</option>
-                        @foreach($roles as $role)
-                        <option value="{{ $role }}" @selected(request('role') === $role)>{{ \App\Enums\UserRole::labels()[$role] }}</option>
+                        @foreach($roleFilterOptions as $roleOption)
+                        <option value="{{ $roleOption['value'] }}" @selected(request('role') === $roleOption['value'])>{{ $roleOption['label'] }}</option>
                         @endforeach
                     </select>
                     <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Apply</button>

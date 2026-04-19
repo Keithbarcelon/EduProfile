@@ -3,13 +3,22 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Department;
 use App\Models\Document;
+use App\Models\Student;
+use App\Models\User;
 use App\Enums\UserRole;
+use App\Support\TenantConfig;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Response;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Throwable;
 
 class DocumentReviewController extends Controller
 {
@@ -21,38 +30,111 @@ class DocumentReviewController extends Controller
 
         $user = Auth::user();
         $schoolId = (int) app('currentSchool')->id;
+        $search = trim((string) request()->input('q', ''));
+        $status = trim((string) request()->input('status', ''));
+        $departmentId = (int) request()->input('department_id', 0);
+        $reviewerId = (int) request()->input('reviewer_id', 0);
+        $uploadedFrom = trim((string) request()->input('uploaded_from', ''));
+        $uploadedTo = trim((string) request()->input('uploaded_to', ''));
 
-        $query = Document::query()
+        $baseQuery = Document::query()
             ->where('school_id', $schoolId)
             ->with(['student.department', 'reviewer'])
-            ->when(request()->filled('status'), fn ($documentQuery) => $documentQuery->where('status', (string) request()->input('status')));
-
-        if ($user->role === UserRole::ADMISSION->value) {
-            $query->whereHas('student', function($q) {
-                $q->where('status_category', 'affirmative');
+            ->when($departmentId > 0, function ($documentQuery) use ($departmentId) {
+                $documentQuery->whereHas('student', fn ($studentQuery) => $studentQuery->where('department_id', $departmentId));
+            })
+            ->when($reviewerId > 0, fn ($documentQuery) => $documentQuery->where('reviewed_by', $reviewerId))
+            ->when($uploadedFrom !== '', fn ($documentQuery) => $documentQuery->whereDate('created_at', '>=', $uploadedFrom))
+            ->when($uploadedTo !== '', fn ($documentQuery) => $documentQuery->whereDate('created_at', '<=', $uploadedTo))
+            ->when($search !== '', function ($documentQuery) use ($search) {
+                $documentQuery->where(function ($innerQuery) use ($search): void {
+                    $innerQuery->where('name', 'like', "%{$search}%")
+                        ->orWhereHas('student', function ($studentQuery) use ($search): void {
+                            $studentQuery->where('student_id', 'like', "%{$search}%")
+                                ->orWhere('first_name', 'like', "%{$search}%")
+                                ->orWhere('last_name', 'like', "%{$search}%");
+                        });
+                });
             });
-        } elseif (in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value])) {
-            $query->whereHas('student', function($q) use ($user) {
-                $q->where('status_category', 'probation')
-                    ->where('department_id', $user->department_id ?? 0);
-            });
-        }
 
-        $documents = $query->latest()->paginate(15);
-        $missingStudents = \App\Models\Student::query()
+        $this->applyRoleVisibilityConstraints($baseQuery, $user);
+
+        $documentsQuery = (clone $baseQuery)
+            ->when($status !== '', fn ($documentQuery) => $documentQuery->where('status', $status));
+
+        $documents = $documentsQuery->latest()->paginate(15)->withQueryString();
+
+        $departments = Department::query()
             ->where('school_id', $schoolId)
-            ->with('department')
-            ->doesntHave('documents')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $reviewers = User::query()
+            ->where('school_id', $schoolId)
+            ->whereIn('role', [
+                UserRole::ADMIN->value,
+                UserRole::TENANT_ADMIN->value,
+                UserRole::ADMISSION->value,
+                UserRole::DEPARTMENT->value,
+                UserRole::FACULTY->value,
+            ])
+            ->orderBy('name')
+            ->get(['id', 'name', 'role']);
+
+        $students = Student::query()
+            ->where('school_id', $schoolId)
+            ->with(['department', 'documents:id,student_id,name'])
             ->latest()
-            ->limit(10)
             ->get();
-        $documentStatusCounts = Document::query()
-            ->where('school_id', $schoolId)
+
+        $missingDocumentMap = [];
+        $missingStudents = $students
+            ->filter(function (Student $student) use (&$missingDocumentMap): bool {
+                $status = strtolower((string) ($student->status_category ?: 'regular'));
+                $required = collect(TenantConfig::requiredDocumentNamesForStatus($status))
+                    ->map(fn ($name) => trim((string) $name))
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                if ($required->isEmpty()) {
+                    return false;
+                }
+
+                $submittedNormalized = $student->documents
+                    ->pluck('name')
+                    ->map(fn ($name) => $this->normalizeDocumentName((string) $name))
+                    ->filter()
+                    ->unique();
+
+                $missing = $required
+                    ->reject(fn (string $name) => $submittedNormalized->contains($this->normalizeDocumentName($name)))
+                    ->values();
+
+                if ($missing->isEmpty()) {
+                    return false;
+                }
+
+                $missingDocumentMap[(int) $student->id] = $missing->all();
+
+                return true;
+            })
+            ->take(10)
+            ->values();
+
+        $documentStatusCounts = (clone $baseQuery)
             ->selectRaw('status, COUNT(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
 
-        return view('admin.documents.index', compact('documents', 'missingStudents', 'documentStatusCounts'));
+        return view('admin.documents.index', compact(
+            'documents',
+            'missingStudents',
+            'missingDocumentMap',
+            'documentStatusCounts',
+            'departments',
+            'reviewers'
+        ));
     }
 
     public function approve(Document $document): RedirectResponse
@@ -82,5 +164,56 @@ class DocumentReviewController extends Controller
         ]);
 
         return back()->with('success', 'Document rejected.');
+    }
+
+    public function view(Document $document): BinaryFileResponse|Response
+    {
+        $this->authorize('view', $document);
+
+        $path = trim((string) $document->file_path);
+
+        if ($path === '' || ! Storage::disk('public')->exists($path)) {
+            abort(404, 'Document file not found.');
+        }
+
+        return response()->file(Storage::disk('public')->path($path));
+    }
+
+    private function normalizeDocumentName(string $name): string
+    {
+        return strtolower(trim(preg_replace('/\s+/', ' ', $name) ?? ''));
+    }
+
+    private function applyRoleVisibilityConstraints(Builder $query, User $user): void
+    {
+        // If review access was explicitly granted via direct permission assignment,
+        // allow tenant-wide review visibility.
+        if ($this->hasDirectDocumentReviewPermission($user)) {
+            return;
+        }
+
+        if ($user->role === UserRole::ADMISSION->value) {
+            $query->whereHas('student', function (Builder $studentQuery): void {
+                $studentQuery->where('status_category', 'affirmative');
+            });
+
+            return;
+        }
+
+        if (in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value], true)) {
+            $query->whereHas('student', function (Builder $studentQuery) use ($user): void {
+                $studentQuery->where('status_category', 'probation')
+                    ->where('department_id', $user->department_id ?? 0);
+            });
+        }
+    }
+
+    private function hasDirectDocumentReviewPermission(User $user): bool
+    {
+        try {
+            return $user->permissions()->where('slug', 'review_documents')->exists();
+        } catch (Throwable) {
+            return false;
+        }
     }
 }

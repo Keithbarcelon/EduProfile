@@ -4,8 +4,11 @@ namespace App\Services;
 
 use App\Enums\UserRole;
 use App\Models\Student;
+use App\Models\StudentCustomFieldValue;
+use App\Support\TenantConfig;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
 class StudentProfileService
@@ -75,6 +78,7 @@ class StudentProfileService
                 'emergency_contact_number' => null,
                 'status' => 'active',
                 'status_category' => 'regular',
+                'custom_fields' => [],
                 'enrolled_at' => now()->toDateString(),
             ]);
         });
@@ -91,9 +95,26 @@ class StudentProfileService
     public function updateStudentProfile(Student $student, array $validated, int $schoolId): void
     {
         $validated['school_id'] = $schoolId;
+        $normalizedCustomFields = $this->sanitizeCustomFields((array) ($validated['custom_fields'] ?? []));
+        $validated['custom_fields'] = $normalizedCustomFields;
 
-        DB::transaction(function () use ($student, $validated) {
+        DB::transaction(function () use ($student, $validated, $normalizedCustomFields, $schoolId) {
             $student->update($validated);
+
+            if (Schema::hasTable('student_custom_field_values')) {
+                StudentCustomFieldValue::query()
+                    ->where('student_id', $student->id)
+                    ->delete();
+
+                foreach ($normalizedCustomFields as $fieldKey => $fieldValue) {
+                    StudentCustomFieldValue::query()->create([
+                        'school_id' => $schoolId,
+                        'student_id' => $student->id,
+                        'field_key' => (string) $fieldKey,
+                        'field_value' => (string) $fieldValue,
+                    ]);
+                }
+            }
 
             if (! $student->user) {
                 return;
@@ -105,6 +126,46 @@ class StudentProfileService
                 'name' => trim(sprintf('%s %s', (string) $validated['first_name'], (string) $validated['last_name'])),
             ]);
         });
+    }
+
+    /**
+     * @param array<string, mixed> $submittedFields
+     * @return array<string, string>
+     */
+    private function sanitizeCustomFields(array $submittedFields): array
+    {
+        $allowedFields = collect(TenantConfig::studentCustomFields())
+            ->pluck('field_key')
+            ->map(fn ($fieldKey) => (string) $fieldKey)
+            ->filter()
+            ->values();
+
+        if ($allowedFields->isEmpty()) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($submittedFields as $fieldKey => $value) {
+            $key = (string) $fieldKey;
+
+            if (! $allowedFields->contains($key)) {
+                continue;
+            }
+
+            if ($value === null) {
+                continue;
+            }
+
+            $stringValue = trim((string) $value);
+            if ($stringValue === '') {
+                continue;
+            }
+
+            $normalized[$key] = $stringValue;
+        }
+
+        return $normalized;
     }
 
     /**

@@ -25,22 +25,67 @@
         </div>
 
         <div class="admin-panel flex flex-col rounded-2xl bg-white shadow-sm overflow-hidden">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-6 py-4">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-6 py-4">
                 <div>
                     <h2 class="text-base font-semibold text-slate-800">Uploaded Documents</h2>
                     <p class="text-sm text-slate-500">Only records from the current tenant are listed.</p>
                 </div>
-                <form method="GET" action="{{ route('admin.documents.index') }}" class="flex flex-wrap items-center gap-3">
+                <form method="GET" action="{{ route('admin.documents.index') }}" class="grid w-full gap-2 sm:grid-cols-2 lg:w-auto lg:grid-cols-3 xl:grid-cols-4">
+                    <input
+                        type="text"
+                        name="q"
+                        value="{{ request('q') }}"
+                        placeholder="Search student/document"
+                        class="rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                    >
+
                     <select name="status" class="rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">All statuses</option>
                         <option value="pending" @selected(request('status') === 'pending')>Pending</option>
                         <option value="approved" @selected(request('status') === 'approved')>Approved</option>
                         <option value="rejected" @selected(request('status') === 'rejected')>Rejected</option>
                     </select>
-                    <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700">Filter</button>
-                    @if(request()->filled('status'))
-                    <a href="{{ route('admin.documents.index') }}" class="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200">Clear</a>
-                    @endif
+
+                    <select name="department_id" class="rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <option value="">All departments</option>
+                        @foreach($departments as $department)
+                            <option value="{{ $department->id }}" @selected((int) request('department_id') === (int) $department->id)>
+                                {{ $department->name }}
+                            </option>
+                        @endforeach
+                    </select>
+
+                    <select name="reviewer_id" class="rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <option value="">All reviewers</option>
+                        @foreach($reviewers as $reviewer)
+                            <option value="{{ $reviewer->id }}" @selected((int) request('reviewer_id') === (int) $reviewer->id)>
+                                {{ $reviewer->name }}
+                            </option>
+                        @endforeach
+                    </select>
+
+                    <input
+                        type="date"
+                        name="uploaded_from"
+                        value="{{ request('uploaded_from') }}"
+                        class="rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                        title="Uploaded from"
+                    >
+
+                    <input
+                        type="date"
+                        name="uploaded_to"
+                        value="{{ request('uploaded_to') }}"
+                        class="rounded-lg border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500"
+                        title="Uploaded to"
+                    >
+
+                    <div class="flex items-center gap-2 sm:col-span-2 lg:col-span-3 xl:col-span-4">
+                        <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700">Apply Filters</button>
+                        @if(!empty(collect(request()->query())->except('page')->filter()->all()))
+                            <a href="{{ route('admin.documents.index') }}" class="rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200">Clear</a>
+                        @endif
+                    </div>
                 </form>
             </div>
 
@@ -64,7 +109,7 @@
                             </td>
                             <td class="px-6 py-4 text-slate-600">{{ $doc->student->department->name ?? 'Unassigned' }}</td>
                             <td class="px-6 py-4">
-                                <a href="{{ asset('storage/' . $doc->file_path) }}" target="_blank" class="font-medium text-emerald-700 hover:underline">{{ $doc->name }}</a>
+                                <a href="{{ route('admin.documents.view', $doc) }}" target="_blank" rel="noopener noreferrer" class="font-medium text-emerald-700 hover:underline">{{ $doc->name }}</a>
                                 <p class="text-xs text-slate-400">{{ $doc->created_at->format('M d, Y') }}</p>
                             </td>
                             <td class="px-6 py-4">
@@ -76,6 +121,7 @@
                                 @if($doc->status === 'pending')
                                     @can('update', $doc)
                                     <div class="flex justify-end gap-2">
+                                        <a href="{{ route('admin.documents.view', $doc) }}" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">View File</a>
                                         <form method="POST" action="{{ route('admin.documents.approve', $doc) }}">
                                             @csrf
                                             <button type="submit" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">Approve</button>
@@ -100,7 +146,10 @@
                                     <span class="text-xs text-slate-400">No review access</span>
                                     @endcan
                                 @else
-                                <span class="text-xs text-slate-500">{{ $doc->reviewer->name ?? 'Reviewed' }}</span>
+                                <div class="inline-flex items-center gap-2">
+                                    <a href="{{ route('admin.documents.view', $doc) }}" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">View File</a>
+                                    <span class="text-xs text-slate-500">{{ $doc->reviewer->name ?? 'Reviewed' }}</span>
+                                </div>
                                 @endif
                             </td>
                         </tr>
@@ -123,7 +172,7 @@
         <div class="rounded-2xl border border-rose-100 bg-white shadow-sm">
             <div class="border-b border-rose-100 px-6 py-4">
                 <h2 class="text-base font-semibold text-slate-800">Missing Submissions</h2>
-                <p class="text-sm text-slate-500">Students with no uploaded documents in this tenant.</p>
+                <p class="text-sm text-slate-500">Students with incomplete required documents for their current status.</p>
             </div>
             <div class="divide-y divide-slate-100">
                 @forelse($missingStudents as $student)
@@ -131,6 +180,9 @@
                     <div>
                         <p class="font-semibold text-slate-800">{{ $student->full_name }}</p>
                         <p class="text-sm text-slate-500">{{ $student->department->name ?? 'Unassigned' }} • {{ $student->student_id }}</p>
+                        @if(!empty($missingDocumentMap[$student->id] ?? []))
+                        <p class="mt-1 text-xs text-rose-700">Missing: {{ implode(', ', $missingDocumentMap[$student->id]) }}</p>
+                        @endif
                     </div>
                     <span class="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-rose-700">Missing</span>
                 </div>

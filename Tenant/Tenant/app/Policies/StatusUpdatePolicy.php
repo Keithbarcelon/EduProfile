@@ -28,6 +28,16 @@ class StatusUpdatePolicy
             return true;
         }
 
+        $requiredRole = strtolower((string) ($statusUpdate->required_role_slug ?? ''));
+        if ($requiredRole !== '') {
+            $userRole = strtolower((string) $user->role);
+            if ($userRole === 'admin') {
+                $userRole = 'tenant_admin';
+            }
+
+            return $userRole === $requiredRole;
+        }
+
         if ($user->role === UserRole::DEPARTMENT->value) {
             return $user->department_id !== null
                 && $statusUpdate->student->department_id === $user->department_id;

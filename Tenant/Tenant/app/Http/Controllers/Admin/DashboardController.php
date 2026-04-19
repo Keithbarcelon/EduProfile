@@ -63,6 +63,12 @@ class DashboardController extends Controller
             ->limit(8)
             ->get();
 
+        $widgetVisibility = [
+            'overview_cards' => true,
+            'status_overview' => true,
+            'document_queue' => true,
+        ];
+
         return view('admin.dashboard', compact(
             'totalStudents',
             'newThisMonth',
@@ -73,7 +79,8 @@ class DashboardController extends Controller
             'courseBreakdown',
             'statusCounts',
             'documentStatusCounts',
-            'recentStudents'
+            'recentStudents',
+            'widgetVisibility'
         ));
     }
 }

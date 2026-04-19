@@ -8,10 +8,12 @@ use App\Models\Department;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\StudentProfileService;
+use App\Support\TenantConfig;
 use App\Enums\UserRole;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Illuminate\View\View;
 
@@ -95,14 +97,36 @@ class StudentController extends Controller
     public function show(Student $student): View
     {
         $this->authorize('view', $student);
-        $student->load(['department', 'user', 'remarks.user', 'documents']);
-        return view('admin.students.show', compact('student'));
+
+        $relations = ['department', 'user', 'remarks.user', 'documents', 'statusUpdates'];
+
+        if (Schema::hasTable('student_custom_field_values')) {
+            $relations[] = 'customFieldValues';
+        }
+
+        $student->load($relations);
+        $customFieldDefinitions = TenantConfig::studentCustomFields();
+        $profileSections = collect(TenantConfig::profileSections())
+            ->keyBy('section_key')
+            ->all();
+
+        $customFieldDefinitionsBySection = collect($customFieldDefinitions)
+            ->groupBy(fn (array $field) => (string) ($field['section'] ?? 'custom_fields'))
+            ->all();
+
+        $customFieldValueMap = $student->customFieldValueMap();
+
+        return view('admin.students.show', compact('student', 'customFieldDefinitions', 'customFieldDefinitionsBySection', 'customFieldValueMap', 'profileSections'));
     }
 
     public function edit(Student $student): View
     {
         $this->authorize('update', $student);
         $schoolId = (int) app('currentSchool')->id;
+
+        if (Schema::hasTable('student_custom_field_values')) {
+            $student->load('customFieldValues');
+        }
 
         $departments = Department::query()
             ->where('school_id', $schoolId)
@@ -119,7 +143,18 @@ class StudentController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
-        return view('admin.students.edit', compact('student', 'departments', 'studentUsers'));
+        $customFieldDefinitions = TenantConfig::studentCustomFields();
+        $profileSections = collect(TenantConfig::profileSections())
+            ->keyBy('section_key')
+            ->all();
+
+        $customFieldDefinitionsBySection = collect($customFieldDefinitions)
+            ->groupBy(fn (array $field) => (string) ($field['section'] ?? 'custom_fields'))
+            ->all();
+
+        $customFieldValueMap = $student->customFieldValueMap();
+
+        return view('admin.students.edit', compact('student', 'departments', 'studentUsers', 'customFieldDefinitions', 'customFieldDefinitionsBySection', 'customFieldValueMap', 'profileSections'));
     }
 
     public function update(UpdateStudentRequest $request, Student $student): RedirectResponse

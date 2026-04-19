@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Register School | EduProfile</title>
+    <title>Register School | Tenant Portal</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
@@ -18,7 +18,7 @@
             <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
                 <a href="{{ route('landing') }}" class="flex items-center gap-3">
                     <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-sky-600 text-sm font-black text-white shadow-lg shadow-cyan-500/25">E</span>
-                    <span class="text-sm font-semibold tracking-wide text-slate-700">EduProfile Tenant</span>
+                    <span class="text-sm font-semibold tracking-wide text-slate-700">Tenant Portal</span>
                 </a>
                 <a href="{{ route('login') }}" class="text-sm font-semibold text-slate-600 transition hover:text-cyan-700">Already registered? Login</a>
             </div>
@@ -28,7 +28,7 @@
             <section class="lg:col-span-4 lg:sticky lg:top-8 lg:self-start">
                 <div class="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-xl shadow-slate-200/60 sm:p-7">
                     <p class="text-xs font-bold uppercase tracking-[0.18em] text-cyan-700">School Onboarding</p>
-                    <h1 class="mt-3 text-3xl font-black leading-tight text-slate-900">Create Your EduProfile Tenant</h1>
+                    <h1 class="mt-3 text-3xl font-black leading-tight text-slate-900">Create Your School Tenant</h1>
                     <p class="mt-3 text-sm leading-relaxed text-slate-600">Set up your school workspace for student profiling, status monitoring, remarks, intervention notes, and compliance document tracking.</p>
 
                     <div class="mt-6 space-y-3 text-sm">

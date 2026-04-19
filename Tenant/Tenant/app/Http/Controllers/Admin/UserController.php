@@ -19,6 +19,8 @@ class UserController extends Controller
     public function index(Request $request): View
     {
         $schoolId = $this->currentSchoolId();
+        $roleFilterOptions = $this->roleFilterOptions($schoolId);
+        $selectedRole = trim((string) $request->input('role', ''));
 
         $users = User::query()
             ->where('school_id', $schoolId)
@@ -32,7 +34,22 @@ class UserController extends Controller
                         ->orWhere('email', 'like', "%{$search}%");
                 });
             })
-            ->when($request->filled('role'), fn ($query) => $query->where('role', (string) $request->input('role')))
+            ->when($selectedRole !== '', function ($query) use ($selectedRole) {
+                if (in_array($selectedRole, $this->manageableRoles(), true)) {
+                    $query->where('role', $selectedRole);
+
+                    return;
+                }
+
+                if ($this->rbacRoleTablesAvailable()) {
+                    $query->whereHas('roles', fn ($roleQuery) => $roleQuery->where('slug', $selectedRole));
+
+                    return;
+                }
+
+                // No RBAC tables yet for this tenant, so force an empty result for unknown role filters.
+                $query->whereRaw('1 = 0');
+            })
             ->when($request->filled('department_id'), fn ($query) => $query->where('department_id', $request->integer('department_id')))
             ->latest()
             ->paginate(12)
@@ -46,7 +63,7 @@ class UserController extends Controller
         return view('admin.users.index', [
             'users' => $users,
             'departments' => $departments,
-            'roles' => $this->manageableRoles(),
+            'roleFilterOptions' => $roleFilterOptions,
         ]);
     }
 
@@ -199,9 +216,53 @@ class UserController extends Controller
         return (int) app('currentSchool')->id;
     }
 
+    /**
+     * @return list<array{value: string, label: string}>
+     */
+    private function roleFilterOptions(int $schoolId): array
+    {
+        $labels = UserRole::labels();
+        $options = array_map(
+            fn (string $role): array => [
+                'value' => $role,
+                'label' => $labels[$role] ?? str($role)->replace('_', ' ')->title()->toString(),
+            ],
+            $this->manageableRoles()
+        );
+
+        if (! $this->rbacRoleTablesAvailable()) {
+            return $options;
+        }
+
+        $existingValues = array_column($options, 'value');
+        $dynamicRoles = Role::query()
+            ->where('school_id', $schoolId)
+            ->orderBy('name')
+            ->get(['slug', 'name']);
+
+        foreach ($dynamicRoles as $role) {
+            if (in_array($role->slug, $existingValues, true)) {
+                continue;
+            }
+
+            $options[] = [
+                'value' => (string) $role->slug,
+                'label' => (string) $role->name,
+            ];
+            $existingValues[] = (string) $role->slug;
+        }
+
+        return $options;
+    }
+
+    private function rbacRoleTablesAvailable(): bool
+    {
+        return Schema::hasTable('roles') && Schema::hasTable('user_role');
+    }
+
     private function syncLegacyRoleMapping(User $user, ?string $legacyRole): void
     {
-        if (! Schema::hasTable('roles') || ! Schema::hasTable('user_role')) {
+        if (! $this->rbacRoleTablesAvailable()) {
             return;
         }
 
