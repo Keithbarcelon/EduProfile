@@ -2,7 +2,7 @@
 
 namespace App\Notifications;
 
-use App\Models\TenantRequest;
+use App\Models\School;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -11,7 +11,7 @@ class TenantRequestReceivedNotification extends Notification
 {
     use Queueable;
 
-    public function __construct(private readonly TenantRequest $tenantRequest)
+    public function __construct(private readonly School $school)
     {
     }
 
@@ -24,11 +24,11 @@ class TenantRequestReceivedNotification extends Notification
     {
         return (new MailMessage)
             ->subject('School Registration Request Received')
-            ->greeting('Hello '.$this->tenantRequest->signup_admin_name.',')
+            ->greeting('Hello '.$this->school->signup_admin_name.',')
             ->line('Your school registration request has been received by EduProfile Central.')
-            ->line('School: '.$this->tenantRequest->tenant_name)
-            ->line('Plan: '.strtoupper((string) $this->tenantRequest->plan_type))
-            ->line('Requested domain: '.($this->tenantRequest->requested_tenant_domain ?? 'Not provided'))
+            ->line('School: '.$this->school->name)
+            ->line('Plan: '.strtoupper((string) $this->school->plan_type))
+            ->line('Requested domain: '.($this->school->requested_tenant_domain ?? 'Not provided'))
             ->line('Status: Pending admin approval')
             ->line('You will receive another email after review.')
             ->line('This is an automated message from EduProfile Central.');

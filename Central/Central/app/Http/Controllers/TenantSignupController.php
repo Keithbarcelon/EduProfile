@@ -25,7 +25,7 @@ class TenantSignupController extends Controller
     {
         $validated = $request->validated();
 
-        $tenantRequest = $this->tenantRequestSubmissionService->submit(
+        $pendingSchool = $this->tenantRequestSubmissionService->submit(
             $validated,
             $request->ip(),
             $request->userAgent()
@@ -33,16 +33,16 @@ class TenantSignupController extends Controller
 
         try {
             Notification::route('mail', $validated['admin_email'])
-                ->notify(new TenantRequestReceivedNotification($tenantRequest));
+                ->notify(new TenantRequestReceivedNotification($pendingSchool));
 
             $reminderEmail = $validated['plan_expiration_email'] ?? null;
             if ($reminderEmail && $reminderEmail !== $validated['admin_email']) {
                 Notification::route('mail', $reminderEmail)
-                    ->notify(new TenantRequestReceivedNotification($tenantRequest));
+                    ->notify(new TenantRequestReceivedNotification($pendingSchool));
             }
         } catch (\Throwable $exception) {
             Log::warning('Tenant request notification failed, continuing without blocking signup flow.', [
-                'tenant_request_id' => $tenantRequest->id,
+                'school_id' => $pendingSchool->id,
                 'admin_email' => $validated['admin_email'],
                 'error' => $exception->getMessage(),
             ]);
@@ -50,6 +50,6 @@ class TenantSignupController extends Controller
 
         return redirect()->route('tenant-signup.create')
                 ->with('success', 'Tenant request submitted successfully. Central admin approval is required before account creation and tenant database provisioning.')
-                ->with('tenant_requested_domain', $tenantRequest->requested_tenant_domain);
+                ->with('tenant_requested_domain', $pendingSchool->requested_tenant_domain);
     }
 }

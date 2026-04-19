@@ -239,6 +239,7 @@
                     <thead class="bg-slate-900/50 text-xs uppercase tracking-wider text-slate-300">
                         <tr>
                             <th class="px-6 py-3 text-left">Plan</th>
+                            <th class="px-6 py-3 text-left">Type</th>
                             <th class="px-6 py-3 text-left">Billing</th>
                             <th class="px-6 py-3 text-left">Features</th>
                             <th class="px-6 py-3 text-left">Tenants</th>
@@ -257,6 +258,16 @@
                                 @endif
                             </td>
                             <td class="px-6 py-3">
+                                @if($plan->is_system_preset)
+                                    <span class="inline-flex rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">System Preset</span>
+                                    @if($plan->preset_key)
+                                        <p class="mt-1 text-xs uppercase text-slate-400">{{ $plan->preset_key }}</p>
+                                    @endif
+                                @else
+                                    <span class="inline-flex rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700">Custom Plan</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-3">
                                 <p class="text-slate-200">{{ ucfirst($plan->billing_cycle) }}</p>
                                 <p class="text-xs text-slate-400">Price: {{ number_format((float) $plan->price, 2) }}</p>
                                 @if($plan->is_sale)
@@ -272,32 +283,71 @@
                             </td>
                             <td class="px-6 py-3 text-right">
                                 <div class="inline-flex flex-wrap items-center justify-end gap-2">
+                                    <a href="{{ route('developer.plans.edit', $plan) }}" class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">View</a>
                                     <a href="{{ route('developer.plans.edit', $plan) }}" class="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-200">Edit</a>
 
-                                    @if($schools->isNotEmpty())
-                                    <form method="POST" action="{{ route('developer.plans.assign', $plan) }}" class="inline-flex items-center gap-2">
+                                    <form method="POST" action="{{ route('developer.plans.duplicate', $plan) }}">
                                         @csrf
-                                        <select name="school_id" class="rounded-lg border-slate-300 bg-white px-2 py-1 text-xs text-slate-800">
-                                            @foreach($schools as $school)
-                                                <option value="{{ $school->id }}">{{ $school->name }}</option>
-                                            @endforeach
-                                        </select>
-                                        <input type="hidden" name="status" value="active">
-                                        <button type="submit" class="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700">Assign</button>
+                                        <button type="submit" class="rounded-lg bg-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-200">Duplicate</button>
                                     </form>
+
+                                    <form method="POST" action="{{ route('developer.plans.set-active', $plan) }}">
+                                        @csrf
+                                        @method('PATCH')
+                                        <input type="hidden" name="is_active" value="{{ $plan->is_active ? '0' : '1' }}">
+                                        <button type="submit" class="rounded-lg {{ $plan->is_active ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' }} px-3 py-1.5 text-xs font-semibold">
+                                            {{ $plan->is_active ? 'Archive' : 'Activate' }}
+                                        </button>
+                                    </form>
+
+                                    @if($schools->isNotEmpty())
+                                    <details class="group rounded-lg border border-slate-700 bg-slate-900 text-left">
+                                        <summary class="cursor-pointer list-none rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700">Assign</summary>
+                                        <form method="POST" action="{{ route('developer.plans.assign', $plan) }}" class="mt-2 grid w-72 gap-2 p-2">
+                                            @csrf
+                                            <label class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Tenant</label>
+                                            <select name="school_id" class="rounded-lg border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-100">
+                                                @foreach($schools as $school)
+                                                    <option value="{{ $school->id }}">{{ $school->name }}</option>
+                                                @endforeach
+                                            </select>
+
+                                            <label class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Status</label>
+                                            <select name="status" class="rounded-lg border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-100">
+                                                <option value="active">Active</option>
+                                                <option value="pending">Pending</option>
+                                                <option value="canceled">Canceled</option>
+                                            </select>
+
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Starts</label>
+                                                    <input type="date" name="starts_at" value="{{ now()->toDateString() }}" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-100">
+                                                </div>
+                                                <div>
+                                                    <label class="text-[11px] font-medium uppercase tracking-wider text-slate-400">Ends</label>
+                                                    <input type="date" name="ends_at" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-100">
+                                                </div>
+                                            </div>
+
+                                            <button type="submit" class="mt-1 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700">Save Assignment</button>
+                                        </form>
+                                    </details>
                                     @endif
 
+                                    @if(! $plan->is_system_preset)
                                     <form method="POST" action="{{ route('developer.plans.destroy', $plan) }}" onsubmit="return confirm('Delete plan {{ addslashes($plan->name) }}?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-200">Delete</button>
                                     </form>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-10 text-center text-slate-400">No plans found.</td>
+                            <td colspan="7" class="px-6 py-10 text-center text-slate-400">No plans found.</td>
                         </tr>
                         @endforelse
                     </tbody>

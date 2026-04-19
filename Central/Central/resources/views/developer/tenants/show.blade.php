@@ -72,6 +72,7 @@
                     @endif
                 </div>
                 <div class="flex items-center gap-2">
+                    <a href="{{ route('developer.tenants.customization.edit', $tenant) }}" class="px-3 py-1.5 rounded-lg bg-cyan-100 text-cyan-700 text-sm">Customization</a>
                     <a href="{{ route('developer.tenants.edit', $tenant) }}" class="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 text-sm">Edit</a>
                     <a href="{{ route('developer.tenants.index') }}" class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-sm">Back</a>
                 </div>
@@ -221,11 +222,17 @@
                     @method('PATCH')
                     <div>
                         <label for="storage_used_mb" class="mb-1 block text-xs text-slate-300">Storage Used (MB)</label>
-                        <input id="storage_used_mb" name="storage_used_mb" type="number" min="0" step="0.01" value="{{ number_format((float) $tenant->storage_used_mb, 2, '.', '') }}" class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500 focus:ring-cyan-500">
+                        <input id="storage_used_mb" name="storage_used_mb" type="number" min="0" step="0.01" value="{{ old('storage_used_mb', number_format((float) $tenant->storage_used_mb, 2, '.', '')) }}" class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500 focus:ring-cyan-500">
+                        @error('storage_used_mb')
+                            <p class="mt-1 text-xs text-rose-300">{{ $message }}</p>
+                        @enderror
                     </div>
                     <div>
                         <label for="bandwidth_used_mb" class="mb-1 block text-xs text-slate-300">Bandwidth Used (MB)</label>
-                        <input id="bandwidth_used_mb" name="bandwidth_used_mb" type="number" min="0" step="0.01" value="{{ number_format((float) $tenant->bandwidth_used_mb, 2, '.', '') }}" class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500 focus:ring-cyan-500">
+                        <input id="bandwidth_used_mb" name="bandwidth_used_mb" type="number" min="0" step="0.01" value="{{ old('bandwidth_used_mb', number_format((float) $tenant->bandwidth_used_mb, 2, '.', '')) }}" class="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100 focus:border-cyan-500 focus:ring-cyan-500">
+                        @error('bandwidth_used_mb')
+                            <p class="mt-1 text-xs text-rose-300">{{ $message }}</p>
+                        @enderror
                     </div>
                     <button type="submit" class="w-full rounded-lg bg-cyan-600 px-3 py-2 text-sm font-semibold text-white hover:bg-cyan-700">Save Usage</button>
                 </form>

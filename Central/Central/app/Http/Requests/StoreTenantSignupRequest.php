@@ -4,7 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use App\Models\TenantRequest;
+use App\Models\School;
 
 class StoreTenantSignupRequest extends FormRequest
 {
@@ -67,8 +67,8 @@ class StoreTenantSignupRequest extends FormRequest
                 'email',
                 'max:255',
                 'unique:users,email',
-                Rule::unique('tenant_requests', 'admin_email')
-                    ->where(fn ($query) => $query->where('status', TenantRequest::STATUS_PENDING)),
+                Rule::unique('schools', 'email')
+                    ->where(fn ($query) => $query->where('approval_status', School::STATUS_PENDING)),
             ],
             'admin_password' => ['required', 'string', 'min:8', 'confirmed'],
             'plan_expiration_email' => ['nullable', 'email', 'max:255'],
@@ -79,8 +79,6 @@ class StoreTenantSignupRequest extends FormRequest
                 'regex:/^(?=.{1,255}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/',
                 Rule::unique('schools', 'tenant_domain'),
                 Rule::unique('schools', 'requested_tenant_domain'),
-                Rule::unique('tenant_requests', 'requested_tenant_domain')
-                    ->where(fn ($query) => $query->where('status', TenantRequest::STATUS_PENDING)),
             ],
         ];
     }

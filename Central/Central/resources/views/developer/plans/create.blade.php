@@ -6,8 +6,8 @@
     </x-slot>
 
     <div class="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-6 shadow-xl backdrop-blur-sm">
-        <h2 class="text-lg font-semibold text-slate-100">Create Dynamic Plan</h2>
-        <p class="mt-1 text-sm text-slate-300">Configure pricing and feature limits without hardcoded plan values.</p>
+        <h2 class="text-lg font-semibold text-slate-100">Create or Configure Plan</h2>
+        <p class="mt-1 text-sm text-slate-300">Use a predefined preset or build a custom modular plan by configuring price, limits, features, and availability.</p>
 
         <form method="POST" action="{{ route('developer.plans.store') }}" class="mt-6">
             @csrf

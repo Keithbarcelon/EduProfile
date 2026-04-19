@@ -47,11 +47,10 @@
                 $role = strtolower($role ?? 'admin');
                 $navItems = [
                     'developer' => [
-                        ['label' => 'Tenant Requests', 'route' => 'developer.tenant-requests.index', 'icon' => 'clipboard-list'],
                         ['label' => 'Tenants', 'route' => 'developer.tenants.index', 'icon' => 'home'],
                         ['label' => 'Plan Management', 'route' => 'developer.tenants.plan-management', 'icon' => 'chart-bar'],
-                        ['label' => 'Support Tickets', 'route' => 'developer.support-tickets.index', 'icon' => 'clipboard-list'],
                         ['label' => 'Tenant Monitoring', 'route' => 'developer.tenants.monitoring', 'icon' => 'clipboard-list'],
+                        ['label' => 'Version Management', 'route' => 'developer.version-management.index', 'icon' => 'cog'],
                     ],
                     'admin' => [
                         ['label' => 'Dashboard',  'route' => 'admin.dashboard',  'icon' => 'home'],
@@ -108,17 +107,16 @@
                 $updatesLabel = (string) config('app.release.updates_label', 'Support & Updates');
             @endphp
 
-            <div class="mb-3 rounded-lg border border-cyan-900/70 bg-cyan-900/30 px-3 py-2">
-                <p class="text-[10px] uppercase tracking-wider text-cyan-300">Application Version</p>
-                <p class="mt-0.5 text-sm font-semibold text-white">{{ $appVersion }}</p>
-                <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+            <div class="mb-3 text-[11px] text-cyan-200/80">
+                <p class="text-[10px] uppercase tracking-wide text-cyan-300/75">Version {{ $appVersion }}</p>
+                <div class="mt-1 flex flex-wrap items-center gap-3">
                     @if($releaseUrl !== '')
-                        <a href="{{ $releaseUrl }}" target="_blank" rel="noopener noreferrer" class="rounded-md border border-cyan-800/80 px-2 py-1 text-cyan-100 hover:bg-cyan-900/70 hover:text-white">
+                        <a href="{{ $releaseUrl }}" target="_blank" rel="noopener noreferrer" class="text-cyan-100/85 hover:text-white">
                             Release GitHub
                         </a>
                     @endif
                     @if($supportUrl !== '')
-                        <a href="{{ $supportUrl }}" target="_blank" rel="noopener noreferrer" class="rounded-md border border-cyan-800/80 px-2 py-1 text-cyan-100 hover:bg-cyan-900/70 hover:text-white">
+                        <a href="{{ $supportUrl }}" target="_blank" rel="noopener noreferrer" class="text-cyan-100/85 hover:text-white">
                             {{ $updatesLabel }}
                         </a>
                     @endif

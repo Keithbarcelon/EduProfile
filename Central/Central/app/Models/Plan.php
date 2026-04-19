@@ -21,6 +21,8 @@ class Plan extends Model
         'starts_at',
         'ends_at',
         'is_active',
+        'is_system_preset',
+        'preset_key',
     ];
 
     protected function casts(): array
@@ -30,6 +32,7 @@ class Plan extends Model
             'sale_price' => 'decimal:2',
             'is_sale' => 'boolean',
             'is_active' => 'boolean',
+            'is_system_preset' => 'boolean',
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
         ];

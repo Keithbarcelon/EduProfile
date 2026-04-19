@@ -43,6 +43,10 @@ class TenantDatabaseProvisioner
         $connectionName = $this->configureTenantConnection($databaseName);
         $tenantMigrationPath = $this->resolveTenantMigrationPath();
 
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(300);
+        }
+
         Artisan::call('migrate', [
             '--database' => $connectionName,
             '--path' => $tenantMigrationPath,

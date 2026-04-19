@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'tenant_usage' => [
+        'bandwidth_window_days' => env('BANDWIDTH_SYNC_WINDOW_DAYS', 30),
+    ],
+
 ];

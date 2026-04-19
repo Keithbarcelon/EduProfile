@@ -110,20 +110,6 @@
     </div>
     @endif
 
-    <div>
-        <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Tenant Contact Email</label>
-        <input id="email" name="email" type="email" value="{{ old('email', $tenant?->email) }}"
-               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-indigo-500 focus:border-indigo-500">
-        @error('email') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
-    </div>
-
-    <div>
-        <label for="contact_number" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Tenant Contact Number</label>
-        <input id="contact_number" name="contact_number" type="text" value="{{ old('contact_number', $tenant?->contact_number) }}"
-               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white focus:ring-indigo-500 focus:border-indigo-500">
-        @error('contact_number') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
-    </div>
-
     @if($isEdit && ! $isPendingForApproval)
         <div class="flex items-center gap-3 mt-2">
             <input id="is_enabled" name="is_enabled" type="checkbox" value="1"

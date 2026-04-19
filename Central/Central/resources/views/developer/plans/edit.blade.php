@@ -6,8 +6,8 @@
     </x-slot>
 
     <div class="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-6 shadow-xl backdrop-blur-sm">
-        <h2 class="text-lg font-semibold text-slate-100">Edit Plan</h2>
-        <p class="mt-1 text-sm text-slate-300">Update plan pricing, sale windows, and feature limits.</p>
+        <h2 class="text-lg font-semibold text-slate-100">Plan Builder</h2>
+        <p class="mt-1 text-sm text-slate-300">Adjust identity, modular features, limits, and promotion settings.</p>
 
         <form method="POST" action="{{ route('developer.plans.update', $plan) }}" class="mt-6">
             @csrf

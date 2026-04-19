@@ -27,6 +27,7 @@ class School extends Model
         'trial_ends_at',
         'plan_expiration_email',
         'signup_admin_name',
+        'signup_admin_password',
         'tenant_domain',
         'requested_tenant_domain',
         'tenant_database',
@@ -48,6 +49,7 @@ class School extends Model
             'plan_started_at' => 'date',
             'plan_due_at' => 'date',
             'trial_ends_at' => 'date',
+            'signup_admin_password' => 'encrypted',
             'storage_used_mb' => 'decimal:2',
             'bandwidth_used_mb' => 'decimal:2',
             'usage_refreshed_at' => 'datetime',
@@ -177,5 +179,20 @@ class School extends Model
     public function tenantPlans(): HasMany
     {
         return $this->hasMany(TenantPlan::class);
+    }
+
+    public function tenantModules(): HasMany
+    {
+        return $this->hasMany(TenantModule::class);
+    }
+
+    public function tenantFeatureFlags(): HasMany
+    {
+        return $this->hasMany(TenantFeatureFlag::class);
+    }
+
+    public function tenantSettings(): HasMany
+    {
+        return $this->hasMany(TenantSetting::class);
     }
 }

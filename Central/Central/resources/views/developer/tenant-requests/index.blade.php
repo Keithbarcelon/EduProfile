@@ -13,6 +13,7 @@
         <div class="rounded-2xl border border-amber-100 bg-gradient-to-br from-white to-amber-50 px-5 py-4 shadow-sm dark:border-amber-900/50 dark:from-slate-900 dark:to-slate-800">
             <p class="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-300">Pending</p>
             <p class="mt-2 text-2xl font-black text-slate-900 dark:text-slate-100">{{ $summary['pending'] }}</p>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Requests: {{ $summary['pending_requests'] ?? 0 }} · Tenant records: {{ $summary['pending_tenants'] ?? 0 }}</p>
         </div>
         <div class="rounded-2xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50 px-5 py-4 shadow-sm dark:border-emerald-900/50 dark:from-slate-900 dark:to-slate-800">
             <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Approved</p>
@@ -26,7 +27,10 @@
 
     <div class="rounded-2xl bg-slate-900/70 shadow-xl border border-slate-700/70 backdrop-blur-sm">
         <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-700/80">
-            <h2 class="text-base font-semibold text-slate-100">Approval Queue</h2>
+            <div>
+                <h2 class="text-base font-semibold text-slate-100">Approval Queue</h2>
+                <p class="mt-1 text-xs text-slate-400">Signup requests submitted via public registration form.</p>
+            </div>
             <a href="{{ route('developer.tenants.index') }}" class="inline-flex items-center justify-center px-4 py-2.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 text-sm font-semibold rounded-xl transition-colors border border-cyan-200 dark:bg-cyan-900/30 dark:border-cyan-800 dark:text-cyan-300 dark:hover:bg-cyan-900/50">
                 Back to Tenants
             </a>
@@ -98,7 +102,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-6 py-10 text-center text-slate-400">No tenant requests found.</td>
+                            <td colspan="7" class="px-6 py-10 text-center text-slate-400">No tenant signup requests found.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -110,5 +114,59 @@
                 {{ $tenantRequests->links() }}
             </div>
         @endif
+    </div>
+
+    <div class="mt-5 rounded-2xl bg-slate-900/70 shadow-xl border border-slate-700/70 backdrop-blur-sm">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-700/80">
+            <div>
+                <h2 class="text-base font-semibold text-slate-100">Pending Tenant Records</h2>
+                <p class="mt-1 text-xs text-slate-400">Tenants created directly from Developer Tenant Management and still pending approval.</p>
+            </div>
+            <a href="{{ route('developer.tenants.index', ['status' => 'pending']) }}" class="inline-flex items-center justify-center px-4 py-2.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-700 text-sm font-semibold rounded-xl transition-colors border border-cyan-200 dark:bg-cyan-900/30 dark:border-cyan-800 dark:text-cyan-300 dark:hover:bg-cyan-900/50">
+                Open Tenant List
+            </a>
+        </div>
+
+        <div class="relative overflow-x-auto lg:overflow-visible">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-900/50 text-xs text-slate-300 uppercase tracking-wider">
+                    <tr>
+                        <th class="px-6 py-3 text-left">School</th>
+                        <th class="px-6 py-3 text-left">Admin</th>
+                        <th class="px-6 py-3 text-left">Plan</th>
+                        <th class="px-6 py-3 text-left">Requested Domain</th>
+                        <th class="px-6 py-3 text-left">Created</th>
+                        <th class="px-6 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-700/70">
+                    @forelse($pendingSchools as $tenant)
+                        <tr class="hover:bg-slate-800/50 transition-colors">
+                            <td class="px-6 py-3">
+                                <p class="font-medium text-slate-100">{{ $tenant->name }}</p>
+                            </td>
+                            <td class="px-6 py-3 text-slate-200">{{ $tenant->signup_admin_name ?? 'N/A' }}</td>
+                            <td class="px-6 py-3 text-slate-200 uppercase font-semibold">{{ $tenant->plan_type }}</td>
+                            <td class="px-6 py-3 text-xs text-slate-300">{{ $tenant->requested_tenant_domain ?? 'N/A' }}</td>
+                            <td class="px-6 py-3 text-xs text-slate-300">{{ $tenant->created_at?->format('M d, Y h:i A') ?? 'N/A' }}</td>
+                            <td class="px-6 py-3 text-right">
+                                <div class="inline-flex items-center gap-2">
+                                    <a href="{{ route('developer.tenants.show', $tenant) }}" class="inline-flex items-center rounded-lg bg-cyan-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-cyan-700">View</a>
+                                    <form method="POST" action="{{ route('developer.tenants.approve', $tenant) }}" class="inline-block">
+                                        @csrf
+                                        @method('PATCH')
+                                        <button type="submit" class="inline-flex items-center rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-emerald-700">Approve</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="6" class="px-6 py-10 text-center text-slate-400">No pending tenant records found.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
     </div>
 </x-layouts.admin>

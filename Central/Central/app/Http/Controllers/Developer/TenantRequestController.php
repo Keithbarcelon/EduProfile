@@ -27,6 +27,7 @@ class TenantRequestController extends Controller
     public function index(Request $request): View
     {
         $query = TenantRequest::query();
+        $pendingSchoolsQuery = School::query()->where('approval_status', School::STATUS_PENDING);
 
         if ($search = $request->string('search')->toString()) {
             $query->where(function (Builder $builder) use ($search): void {
@@ -35,10 +36,21 @@ class TenantRequestController extends Controller
                     ->orWhere('signup_admin_name', 'like', "%{$search}%")
                     ->orWhere('requested_tenant_domain', 'like', "%{$search}%");
             });
+
+            $pendingSchoolsQuery->where(function (Builder $builder) use ($search): void {
+                $builder->where('name', 'like', "%{$search}%")
+                    ->orWhere('signup_admin_name', 'like', "%{$search}%")
+                    ->orWhere('plan_expiration_email', 'like', "%{$search}%")
+                    ->orWhere('requested_tenant_domain', 'like', "%{$search}%");
+            });
         }
 
         if ($status = $request->string('status')->toString()) {
             $query->where('status', $status);
+
+            if ($status !== TenantRequest::STATUS_PENDING) {
+                $pendingSchoolsQuery->whereRaw('1 = 0');
+            }
         }
 
         $tenantRequests = $query
@@ -48,14 +60,31 @@ class TenantRequestController extends Controller
             ->paginate(15)
             ->withQueryString();
 
+        $pendingTenantRequestsCount = TenantRequest::where('status', TenantRequest::STATUS_PENDING)->count();
+        $pendingSchoolsCount = School::where('approval_status', School::STATUS_PENDING)->count();
+
         $summary = [
             'total' => TenantRequest::count(),
-            'pending' => TenantRequest::where('status', TenantRequest::STATUS_PENDING)->count(),
+            'pending' => $pendingTenantRequestsCount + $pendingSchoolsCount,
+            'pending_requests' => $pendingTenantRequestsCount,
+            'pending_tenants' => $pendingSchoolsCount,
             'approved' => TenantRequest::where('status', TenantRequest::STATUS_APPROVED)->count(),
             'rejected' => TenantRequest::where('status', TenantRequest::STATUS_REJECTED)->count(),
         ];
 
-        return view('developer.tenant-requests.index', compact('tenantRequests', 'summary'));
+        $pendingSchools = $pendingSchoolsQuery
+            ->latest()
+            ->limit(15)
+            ->get([
+                'id',
+                'name',
+                'signup_admin_name',
+                'plan_type',
+                'requested_tenant_domain',
+                'created_at',
+            ]);
+
+        return view('developer.tenant-requests.index', compact('tenantRequests', 'summary', 'pendingSchools'));
     }
 
     public function show(TenantRequest $tenantRequest): View

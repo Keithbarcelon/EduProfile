@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use InvalidArgumentException;
 
@@ -34,10 +35,10 @@ class TenantController extends Controller
 
     public function index(Request $request): View
     {
-        $query = School::query();
+        $baseQuery = School::query();
 
         if ($search = $request->string('search')->toString()) {
-            $query->where(function ($q) use ($search) {
+            $baseQuery->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('address', 'like', "%{$search}%")
                   ->orWhere('signup_admin_name', 'like', "%{$search}%")
@@ -49,14 +50,29 @@ class TenantController extends Controller
         }
 
         if ($plan = $request->input('plan_type')) {
-            $query->where('plan_type', $plan);
+            $baseQuery->where('plan_type', $plan);
         }
 
-        $this->applyStatusFilter($query, $request->input('status'));
+        $pendingQuery = clone $baseQuery;
+        $enabledQuery = clone $baseQuery;
+        $disabledQuery = clone $baseQuery;
 
-        $tenants = $query->latest()->paginate(15)->withQueryString();
+        $pendingQuery->where('approval_status', School::STATUS_PENDING);
+        $enabledQuery->where('approval_status', School::STATUS_APPROVED)->where('is_enabled', true);
+        $disabledQuery->where('approval_status', School::STATUS_APPROVED)->where('is_enabled', false);
 
-        return view('developer.tenants.index', compact('tenants'));
+        $summary = [
+            'total' => (clone $baseQuery)->count(),
+            'pending' => (clone $pendingQuery)->count(),
+            'enabled' => (clone $enabledQuery)->count(),
+            'disabled' => (clone $disabledQuery)->count(),
+        ];
+
+        $pendingTenants = $pendingQuery->latest()->paginate(10, ['*'], 'pending_page')->withQueryString();
+        $enabledTenants = $enabledQuery->latest()->paginate(10, ['*'], 'enabled_page')->withQueryString();
+        $disabledTenants = $disabledQuery->latest()->paginate(10, ['*'], 'disabled_page')->withQueryString();
+
+        return view('developer.tenants.index', compact('summary', 'pendingTenants', 'enabledTenants', 'disabledTenants'));
     }
 
     public function planManagement(Request $request): View
@@ -187,13 +203,16 @@ class TenantController extends Controller
     {
         $schools = School::query()
             ->whereNotNull('tenant_database')
-            ->get(['id', 'tenant_database', 'storage_used_mb']);
+            ->get(['id', 'tenant_database', 'storage_used_mb', 'bandwidth_used_mb']);
 
         if ($schools->isEmpty()) {
             return back()->with('error', 'No tenant databases found to sync usage from.');
         }
 
         $storageMap = $this->fetchDatabaseStorageUsageMap(
+            $schools->pluck('tenant_database')->filter()->values()->all()
+        );
+        $bandwidthMap = $this->fetchBandwidthUsageMapByDatabase(
             $schools->pluck('tenant_database')->filter()->values()->all()
         );
 
@@ -203,9 +222,14 @@ class TenantController extends Controller
         foreach ($schools as $school) {
             $database = (string) $school->tenant_database;
             $storage = (float) ($storageMap[$database] ?? 0);
+            $hasBandwidthMetric = array_key_exists($database, $bandwidthMap);
+            $bandwidth = $hasBandwidthMetric
+                ? (float) $bandwidthMap[$database]
+                : (float) $school->bandwidth_used_mb;
 
-            if ((float) $school->storage_used_mb !== $storage) {
+            if ((float) $school->storage_used_mb !== $storage || ($hasBandwidthMetric && (float) $school->bandwidth_used_mb !== $bandwidth)) {
                 $school->storage_used_mb = $storage;
+                $school->bandwidth_used_mb = $bandwidth;
                 $school->usage_refreshed_at = $now;
                 $school->save();
                 $affected++;
@@ -216,11 +240,16 @@ class TenantController extends Controller
             $school->save();
         }
 
-        return back()->with('success', "Usage sync complete. Updated: {$affected} tenant(s).");
+        return back()->with('success', "Usage sync complete. Updated: {$affected} tenant(s). Bandwidth is sourced automatically from tenant traffic metrics.");
     }
 
     public function updateUsage(Request $request, School $tenant): RedirectResponse
     {
+        $request->merge([
+            'storage_used_mb' => $this->normalizeDecimalInput($request->input('storage_used_mb')),
+            'bandwidth_used_mb' => $this->normalizeDecimalInput($request->input('bandwidth_used_mb')),
+        ]);
+
         $validated = $request->validate([
             'storage_used_mb' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
             'bandwidth_used_mb' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
@@ -263,8 +292,9 @@ class TenantController extends Controller
         $days = max((int) $request->input('days', 7), 1);
         $eventType = $tenant->isSubscriptionExpired() ? 'subscription_expired' : 'subscription_expiring';
 
-        Notification::route('mail', $tenant->plan_expiration_email)
-            ->notify(new TenantLifecycleNotification($tenant, $eventType));
+        if (! $this->sendLifecycleNotification($tenant, $eventType)) {
+            return back()->with('error', 'Reminder was not sent due to email transport failure. Please verify SMTP credentials.');
+        }
 
         return back()->with('success', 'Subscription reminder sent successfully.');
     }
@@ -295,7 +325,6 @@ class TenantController extends Controller
     {
         $validated = $request->validated();
         $adminEmail = $validated['admin_email'];
-        $adminPassword = $validated['admin_password'];
         $billingCycle = $validated['billing_cycle'] ?? 'monthly';
         $trialEndsAt = $this->resolveTrialEndsAt($validated['plan_started_at'] ?? null, (int) ($validated['free_trial_days'] ?? 0));
 
@@ -306,16 +335,13 @@ class TenantController extends Controller
             $domainInput .= '.localhost';
         }
 
-        // DDL statements (CREATE DATABASE) can break MySQL transactions, so provision first.
-        $this->databaseProvisioner->createDatabase($databaseName);
-
         $tenant = DB::transaction(function () use ($validated, $databaseName, $billingCycle, $trialEndsAt, $domainInput): School {
             return School::create([
                 'name' => $validated['name'],
                 'school_type' => $validated['school_type'] ?? 'School',
                 'address' => $validated['address'],
-                'email' => $validated['email'] ?? $validated['admin_email'],
-                'contact_number' => $validated['contact_number'] ?? null,
+                'email' => $validated['admin_email'],
+                'contact_number' => null,
                 'plan_type' => $validated['plan_type'],
                 'plan_started_at' => $validated['plan_started_at'] ?? null,
                 'plan_due_at' => $validated['plan_due_at'] ?? null,
@@ -323,6 +349,7 @@ class TenantController extends Controller
                 'trial_ends_at' => $trialEndsAt,
                 'plan_expiration_email' => $validated['plan_expiration_email'],
                 'signup_admin_name' => $validated['signup_admin_name'],
+                'signup_admin_password' => $validated['admin_password'],
                 'tenant_domain' => null,
                 'requested_tenant_domain' => $domainInput,
                 'tenant_database' => $databaseName,
@@ -331,30 +358,6 @@ class TenantController extends Controller
                 'approved_at' => null,
             ]);
         });
-
-        try {
-            $this->databaseProvisioner->migrateTenantSchema($databaseName);
-            $this->databaseProvisioner->seedTenantCoreData($databaseName, [
-                'name' => $tenant->name,
-                'school_type' => $tenant->school_type,
-                'address' => $tenant->address,
-                'email' => $tenant->email,
-                'contact_number' => $tenant->contact_number,
-                'plan_type' => $tenant->plan_type,
-                'plan_started_at' => optional($tenant->plan_started_at)->toDateString(),
-                'plan_due_at' => optional($tenant->plan_due_at)->toDateString(),
-                'plan_expiration_email' => $tenant->plan_expiration_email,
-                'signup_admin_name' => $tenant->signup_admin_name,
-                'tenant_domain' => null,
-                'is_enabled' => false,
-            ], [
-                'name' => $tenant->signup_admin_name,
-                'email' => $adminEmail,
-                'password' => $adminPassword,
-            ]);
-        } catch (InvalidArgumentException $exception) {
-            return back()->withInput()->withErrors(['admin_password' => $exception->getMessage()]);
-        }
 
         $this->sendRegistrationNotifications($tenant, $adminEmail);
 
@@ -406,8 +409,8 @@ class TenantController extends Controller
             'name' => $validated['name'],
             'school_type' => $validated['school_type'] ?? 'School',
             'address' => $validated['address'],
-            'email' => $validated['email'] ?? null,
-            'contact_number' => $validated['contact_number'] ?? null,
+            'email' => $validated['admin_email'] ?? $tenant->email,
+            'contact_number' => $tenant->contact_number,
             'plan_type' => $validated['plan_type'],
             'plan_started_at' => $validated['plan_started_at'] ?? null,
             'plan_due_at' => $validated['plan_due_at'] ?? null,
@@ -415,11 +418,17 @@ class TenantController extends Controller
             'trial_ends_at' => $trialEndsAt,
             'plan_expiration_email' => $validated['plan_expiration_email'],
             'signup_admin_name' => $validated['signup_admin_name'],
+            'signup_admin_password' => $adminPassword !== '' ? $adminPassword : $tenant->signup_admin_password,
             'tenant_domain' => $nextDomain,
             'requested_tenant_domain' => $nextRequestedDomain,
             'tenant_database' => $tenant->tenant_database ?? $validated['tenant_database'],
             'is_enabled' => $isApproved ? (bool) ($validated['is_enabled'] ?? false) : false,
         ]);
+
+        if (! $tenant->isApproved()) {
+            return redirect()->route('developer.tenants.index')
+                ->with('success', 'Pending tenant updated successfully. Provisioning will run on approval.');
+        }
 
         try {
             $this->databaseProvisioner->createDatabase($tenant->tenant_database);
@@ -466,6 +475,8 @@ class TenantController extends Controller
             return back()->with('error', 'Cannot approve tenant without a tenant database name. Please update the tenant record first.');
         }
 
+        $stagedAdminPassword = (string) ($tenant->signup_admin_password ?? '');
+
         $domain = $this->resolveDomainForApproval($tenant);
 
         if (
@@ -479,14 +490,6 @@ class TenantController extends Controller
         ) {
             return back()->with('error', 'Requested domain is already in use. Please edit the tenant and provide a different preferred domain before approval.');
         }
-
-        $tenant->update([
-            'tenant_domain' => $domain,
-            'requested_tenant_domain' => $domain,
-            'approval_status' => 'approved',
-            'approved_at' => now(),
-            'is_enabled' => true,
-        ]);
 
         try {
             $this->databaseProvisioner->createDatabase($databaseName);
@@ -502,20 +505,60 @@ class TenantController extends Controller
                 'plan_due_at' => optional($tenant->plan_due_at)->toDateString(),
                 'plan_expiration_email' => $tenant->plan_expiration_email,
                 'signup_admin_name' => $tenant->signup_admin_name,
-                'tenant_domain' => $tenant->tenant_domain,
+                'tenant_domain' => $domain,
                 'is_enabled' => true,
             ], [
                 'name' => $tenant->signup_admin_name,
                 'email' => $adminEmail,
-                'password' => '',
+                'password' => $stagedAdminPassword,
             ]);
-        } catch (InvalidArgumentException $exception) {
+
+            $tenant->update([
+                'tenant_domain' => $domain,
+                'requested_tenant_domain' => $domain,
+                'approval_status' => School::STATUS_APPROVED,
+                'approved_at' => now(),
+                'is_enabled' => true,
+                'signup_admin_password' => null,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::error('Tenant approval provisioning failed.', [
+                'tenant_id' => $tenant->id,
+                'tenant_database' => $databaseName,
+                'domain' => $domain,
+                'error' => $exception->getMessage(),
+            ]);
+
             return back()->with('error', $exception->getMessage());
         }
 
         $this->notifyTenantApproval($tenant, $adminEmail);
 
         return back()->with('success', "Tenant approved. Domain activated: {$tenant->tenant_domain}");
+    }
+
+    public function reject(School $tenant): RedirectResponse
+    {
+        if ($tenant->isApproved()) {
+            return back()->with('error', 'Approved tenants cannot be rejected. Disable or delete instead.');
+        }
+
+        $validated = request()->validate([
+            'rejection_reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $tenantName = (string) $tenant->name;
+        $reason = trim((string) ($validated['rejection_reason'] ?? ''));
+
+        $tenant->delete();
+
+        $message = "Pending tenant \"{$tenantName}\" was rejected and removed.";
+
+        if ($reason !== '') {
+            $message .= " Reason: {$reason}";
+        }
+
+        return redirect()->route('developer.tenants.index')->with('success', $message);
     }
 
     public function updateSubscription(UpdateTenantSubscriptionRequest $request, School $tenant): RedirectResponse
@@ -531,13 +574,14 @@ class TenantController extends Controller
             'plan_expiration_email' => $validated['plan_expiration_email'],
         ]);
 
-        if ($tenant->plan_expiration_email) {
-            Notification::route('mail', $tenant->plan_expiration_email)
-                ->notify(new TenantLifecycleNotification($tenant, 'subscription_updated'));
+        $message = 'Tenant subscription updated successfully.';
+
+        if ($tenant->plan_expiration_email && ! $this->sendLifecycleNotification($tenant, 'subscription_updated')) {
+            $message .= ' Subscription was saved, but email notification failed.';
         }
 
         return redirect()->route('developer.tenants.show', $tenant)
-            ->with('success', 'Tenant subscription updated successfully.');
+            ->with('success', $message);
     }
 
     public function destroy(School $tenant): RedirectResponse
@@ -571,13 +615,37 @@ class TenantController extends Controller
             return redirect()->route('developer.tenants.index')->with('error', $exception->getMessage());
         }
 
-        if ($tenant->plan_expiration_email) {
-            Notification::route('mail', $tenant->plan_expiration_email)
-                ->notify(new TenantLifecycleNotification($tenant, $tenant->is_enabled ? 'enabled' : 'disabled'));
+        $message = $tenant->is_enabled ? 'Tenant enabled.' : 'Tenant disabled.';
+
+        if ($tenant->plan_expiration_email && ! $this->sendLifecycleNotification($tenant, $tenant->is_enabled ? 'enabled' : 'disabled')) {
+            $message .= ' Status changed, but email notification failed.';
         }
 
         return redirect()->route('developer.tenants.index')
-            ->with('success', $tenant->is_enabled ? 'Tenant enabled.' : 'Tenant disabled.');
+            ->with('success', $message);
+    }
+
+    private function sendLifecycleNotification(School $tenant, string $eventType): bool
+    {
+        if (! $tenant->plan_expiration_email) {
+            return false;
+        }
+
+        try {
+            Notification::route('mail', $tenant->plan_expiration_email)
+                ->notify(new TenantLifecycleNotification($tenant, $eventType));
+
+            return true;
+        } catch (\Throwable $exception) {
+            Log::warning('Tenant lifecycle notification failed.', [
+                'tenant_id' => $tenant->id,
+                'tenant_email' => $tenant->plan_expiration_email,
+                'event_type' => $eventType,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     private function notifyTenantApproval(School $tenant, string $adminEmail): void
@@ -673,12 +741,17 @@ class TenantController extends Controller
         }
 
         $storageMap = $this->fetchDatabaseStorageUsageMap($databaseNames);
+        $bandwidthMap = $this->fetchBandwidthUsageMapByDatabase($databaseNames);
 
-        $schools->each(function (School $school) use ($storageMap): void {
+        $schools->each(function (School $school) use ($storageMap, $bandwidthMap): void {
             $database = (string) $school->tenant_database;
 
             if ($database !== '' && array_key_exists($database, $storageMap)) {
                 $school->storage_used_mb = (float) $storageMap[$database];
+            }
+
+            if ($database !== '' && array_key_exists($database, $bandwidthMap)) {
+                $school->bandwidth_used_mb = (float) $bandwidthMap[$database];
             }
         });
     }
@@ -717,5 +790,46 @@ class TenantController extends Controller
         }
 
         return Carbon::parse($planStartedAt)->addDays($trialDays)->toDateString();
+    }
+
+    private function fetchBandwidthUsageMapByDatabase(array $databaseNames): array
+    {
+        if ($databaseNames === [] || ! Schema::hasTable('tenant_bandwidth_metrics')) {
+            return [];
+        }
+
+        $days = max((int) config('services.tenant_usage.bandwidth_window_days', 30), 1);
+        $windowStart = now()->subDays($days - 1)->toDateString();
+
+        $rows = DB::table('tenant_bandwidth_metrics')
+            ->selectRaw('tenant_database, ROUND(SUM(total_bytes) / 1024 / 1024, 2) AS bandwidth_mb')
+            ->whereIn('tenant_database', $databaseNames)
+            ->whereDate('usage_date', '>=', $windowStart)
+            ->groupBy('tenant_database')
+            ->get();
+
+        $usage = [];
+
+        foreach ($rows as $row) {
+            $usage[$row->tenant_database] = (float) $row->bandwidth_mb;
+        }
+
+        return $usage;
+    }
+
+    private function normalizeDecimalInput(mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        // Accept values entered with locale separators like "1,234.56" or "123,45".
+        $normalized = str_replace(' ', '', trim($value));
+
+        if (str_contains($normalized, ',') && ! str_contains($normalized, '.')) {
+            return str_replace(',', '.', $normalized);
+        }
+
+        return str_replace(',', '', $normalized);
     }
 }
