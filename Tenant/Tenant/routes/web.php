@@ -109,6 +109,7 @@ Route::middleware(['auth', 'tenant.active'])->group(function () {
         Route::post('/check', [SupportUpdatesController::class, 'check'])->name('check');
         Route::post('/check-json', [SupportUpdatesController::class, 'checkJson'])->name('check-json');
         Route::post('/acknowledge', [SupportUpdatesController::class, 'acknowledge'])->name('acknowledge');
+        Route::post('/sync-latest', [SupportUpdatesController::class, 'syncLatest'])->name('sync-latest');
         Route::post('/requests', [SupportUpdatesController::class, 'storeRequest'])->name('requests.store');
     });
 

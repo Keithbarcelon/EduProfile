@@ -51,6 +51,7 @@
                         ['label' => 'Plan Management', 'route' => 'developer.tenants.plan-management', 'icon' => 'chart-bar'],
                         ['label' => 'Tenant Monitoring', 'route' => 'developer.tenants.monitoring', 'icon' => 'clipboard-list'],
                         ['label' => 'Version Management', 'route' => 'developer.version-management.index', 'icon' => 'cog'],
+                        ['label' => 'Support Requests', 'route' => 'developer.support-requests.index', 'icon' => 'chat-bubble-left'],
                     ],
                     'admin' => [
                         ['label' => 'Dashboard',  'route' => 'admin.dashboard',  'icon' => 'home'],

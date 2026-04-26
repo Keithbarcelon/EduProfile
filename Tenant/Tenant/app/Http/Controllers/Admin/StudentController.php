@@ -35,7 +35,16 @@ class StudentController extends Controller
             ->where('school_id', $schoolId)
             ->with(['department', 'user'])
             ->when(in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value]), function ($query) use ($user) {
-                $query->where('department_id', $user->department_id ?? 0);
+                $departmentId = $user->department_id;
+
+                $query->where(function ($builder) use ($departmentId) {
+                    if ($departmentId !== null) {
+                        $builder->where('department_id', $departmentId)
+                            ->orWhereNull('department_id');
+                    } else {
+                        $builder->whereNull('department_id');
+                    }
+                });
             })
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {

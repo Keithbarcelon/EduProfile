@@ -66,16 +66,32 @@ class RoleManagementService
         $validRoles = Role::query()
             ->where('school_id', $user->school_id)
             ->whereIn('id', $roleIds)
+            ->get(['id', 'slug']);
+
+        $validRoleIds = $validRoles
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
 
         $pivotData = [];
-        foreach ($validRoles as $roleId) {
+        foreach ($validRoleIds as $roleId) {
             $pivotData[$roleId] = ['assigned_by' => $assignedBy];
         }
 
         $user->roles()->sync($pivotData);
+
+        $resolvedLegacyRole = $this->resolveLegacyRoleFromRbacSlugs(
+            $validRoles
+                ->pluck('slug')
+                ->map(fn ($slug) => strtolower(str_replace('-', '_', trim((string) $slug))) ?: '')
+                ->filter(fn ($slug) => $slug !== '')
+                ->values()
+                ->all()
+        );
+
+        if ($resolvedLegacyRole !== null && $resolvedLegacyRole !== $user->role) {
+            $user->forceFill(['role' => $resolvedLegacyRole])->save();
+        }
     }
 
     /**
@@ -123,5 +139,32 @@ class RoleManagementService
             ->where('slug', $slug)
             ->when($ignoreRoleId, fn ($query) => $query->whereKeyNot($ignoreRoleId))
             ->exists();
+    }
+
+    /**
+     * @param list<string> $rbacRoleSlugs
+     */
+    private function resolveLegacyRoleFromRbacSlugs(array $rbacRoleSlugs): ?string
+    {
+        if ($rbacRoleSlugs === []) {
+            return null;
+        }
+
+        $rolePriority = [
+            'tenant_admin',
+            'admin',
+            'admission',
+            'department',
+            'faculty',
+            'student',
+        ];
+
+        foreach ($rolePriority as $priorityRole) {
+            if (in_array($priorityRole, $rbacRoleSlugs, true)) {
+                return $priorityRole === 'admin' ? 'tenant_admin' : $priorityRole;
+            }
+        }
+
+        return null;
     }
 }

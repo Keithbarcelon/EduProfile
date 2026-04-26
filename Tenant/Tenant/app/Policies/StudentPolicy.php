@@ -24,7 +24,12 @@ class StudentPolicy
         }
 
         if (in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value])) {
-            return $user->department_id !== null && $user->department_id === $student->department_id;
+            if ($user->department_id === null) {
+                return $student->department_id === null;
+            }
+
+            return $student->department_id === null
+                || $user->department_id === $student->department_id;
         }
 
         return false;

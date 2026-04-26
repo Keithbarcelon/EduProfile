@@ -8,6 +8,7 @@ use App\Models\Role;
 use App\Services\RoleManagementService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -17,8 +18,12 @@ class RoleController extends Controller
     {
     }
 
-    public function index(): View
+    public function index(): View|RedirectResponse
     {
+        if (! $this->rbacTablesAvailable()) {
+            return $this->missingRbacTablesResponse();
+        }
+
         $schoolId = $this->currentSchoolId();
 
         $roles = Role::query()
@@ -33,8 +38,12 @@ class RoleController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(): View|RedirectResponse
     {
+        if (! $this->rbacTablesAvailable()) {
+            return $this->missingRbacTablesResponse();
+        }
+
         return view('admin.roles.create', [
             'permissions' => $this->permissionsByModule(),
         ]);
@@ -42,6 +51,10 @@ class RoleController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        if (! $this->rbacTablesAvailable()) {
+            return $this->missingRbacTablesResponse();
+        }
+
         $validated = $this->validateRole($request);
 
         $this->roleManagementService->createRole($this->currentSchoolId(), $validated);
@@ -50,8 +63,12 @@ class RoleController extends Controller
             ->with('success', 'Role created successfully.');
     }
 
-    public function edit(Role $role): View
+    public function edit(Role $role): View|RedirectResponse
     {
+        if (! $this->rbacTablesAvailable()) {
+            return $this->missingRbacTablesResponse();
+        }
+
         $this->ensureRoleInCurrentSchool($role);
 
         return view('admin.roles.edit', [
@@ -62,6 +79,10 @@ class RoleController extends Controller
 
     public function update(Request $request, Role $role): RedirectResponse
     {
+        if (! $this->rbacTablesAvailable()) {
+            return $this->missingRbacTablesResponse();
+        }
+
         $this->ensureRoleInCurrentSchool($role);
         $validated = $this->validateRole($request, $role);
 
@@ -73,6 +94,10 @@ class RoleController extends Controller
 
     public function destroy(Role $role): RedirectResponse
     {
+        if (! $this->rbacTablesAvailable()) {
+            return $this->missingRbacTablesResponse();
+        }
+
         $this->ensureRoleInCurrentSchool($role);
 
         $this->roleManagementService->deleteRole($role);
@@ -100,11 +125,29 @@ class RoleController extends Controller
 
     private function permissionsByModule(): \Illuminate\Support\Collection
     {
+        if (! $this->rbacTablesAvailable()) {
+            return collect();
+        }
+
         return Permission::query()
             ->orderBy('module')
             ->orderBy('name')
             ->get()
             ->groupBy(fn (Permission $permission) => $permission->module ?: 'General');
+    }
+
+    private function rbacTablesAvailable(): bool
+    {
+        return Schema::hasTable('roles')
+            && Schema::hasTable('permissions')
+            && Schema::hasTable('role_permission')
+            && Schema::hasTable('user_role');
+    }
+
+    private function missingRbacTablesResponse(): RedirectResponse
+    {
+        return redirect()->route('admin.dashboard')
+            ->with('error', 'Role management is unavailable until the tenant RBAC tables are migrated.');
     }
 
     private function ensureRoleInCurrentSchool(Role $role): void

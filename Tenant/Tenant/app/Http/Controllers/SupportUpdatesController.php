@@ -101,6 +101,24 @@ class SupportUpdatesController extends Controller
             ->with('success', 'Update notice acknowledged.');
     }
 
+    public function syncLatest(Request $request): RedirectResponse
+    {
+        abort_unless(in_array($request->user()?->role, ['admin', 'tenant_admin'], true), 403);
+
+        $school = app('currentSchool');
+        abort_unless($school instanceof School, 404);
+
+        try {
+            $result = $this->updateCheckerService->syncCurrentVersionToLatest($school);
+        } catch (\RuntimeException $exception) {
+            return redirect()->route('support-updates.index')
+                ->with('error', $exception->getMessage());
+        }
+
+        return redirect()->route('support-updates.index')
+            ->with('success', 'Current tenant version synced to '.$result['version'].' (source: '.$result['source'].').');
+    }
+
     public function checkJson(Request $request): JsonResponse
     {
         $school = app('currentSchool');
@@ -159,7 +177,7 @@ class SupportUpdatesController extends Controller
         ]);
 
         return redirect()->route('support-updates.index')
-            ->with('success', 'Support request submitted successfully.');
+            ->with('success', 'Support request submitted successfully. The central team will review and respond to your request.');
     }
 
     private function safeReleaseNotes()

@@ -19,8 +19,13 @@ class UserRoleController extends Controller
     {
     }
 
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
+        if (! $this->rbacTablesAvailable()) {
+            return redirect()->route('admin.dashboard')
+                ->with('error', 'Role assignments are unavailable until the tenant RBAC tables are migrated.');
+        }
+
         $schoolId = $this->currentSchoolId();
         $supportsDirectPermissions = Schema::hasTable('permissions') && Schema::hasTable('user_permission');
 
@@ -60,6 +65,11 @@ class UserRoleController extends Controller
         $schoolId = $this->currentSchoolId();
         abort_unless((int) $user->school_id === $schoolId, 404);
 
+        if (! $this->rbacTablesAvailable()) {
+            return redirect()->route('admin.dashboard')
+                ->with('error', 'Role assignments are unavailable until the tenant RBAC tables are migrated.');
+        }
+
         $rules = [
             'role_ids' => ['nullable', 'array'],
             'role_ids.*' => [
@@ -90,5 +100,10 @@ class UserRoleController extends Controller
     private function currentSchoolId(): int
     {
         return (int) app('currentSchool')->id;
+    }
+
+    private function rbacTablesAvailable(): bool
+    {
+        return Schema::hasTable('roles') && Schema::hasTable('user_role');
     }
 }
