@@ -28,15 +28,11 @@ class StudentController extends Controller
     public function index(Request $request): View
     {
         $this->authorize('viewAny', Student::class);
-        $user = $request->user();
         $schoolId = (int) app('currentSchool')->id;
 
         $students = Student::query()
-            ->where('school_id', $schoolId)
+            ->byDepartment()
             ->with(['department', 'user'])
-            ->when(in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value]), function ($query) use ($user) {
-                $query->where('department_id', $user->department_id ?? 0);
-            })
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('student_id', 'like', "%{$search}%")
@@ -51,19 +47,18 @@ class StudentController extends Controller
             ->paginate(15);
 
         $departments = Department::query()
-            ->where('school_id', $schoolId)
             ->orderBy('name')
             ->get();
 
         $overview = [
-            'total' => Student::query()->where('school_id', $schoolId)->count(),
-            'regular' => Student::query()->where('school_id', $schoolId)->where('status_category', 'regular')->count(),
-            'affirmative' => Student::query()->where('school_id', $schoolId)->where('status_category', 'affirmative')->count(),
-            'probation' => Student::query()->where('school_id', $schoolId)->where('status_category', 'probation')->count(),
+            'total' => Student::query()->byDepartment()->count(),
+            'regular' => Student::query()->byDepartment()->where('status_category', 'regular')->count(),
+            'affirmative' => Student::query()->byDepartment()->where('status_category', 'affirmative')->count(),
+            'probation' => Student::query()->byDepartment()->where('status_category', 'probation')->count(),
         ];
 
         $unlinkedStudentUsers = User::query()
-            ->where('school_id', $schoolId)
+            ->byDepartment()
             ->where('role', UserRole::STUDENT->value)
             ->whereDoesntHave('student')
             ->with('department')

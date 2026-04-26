@@ -63,6 +63,13 @@
                     </button>
 
                     @if($isTenantAdmin)
+                        <form method="POST" action="{{ route('support-updates.sync-latest') }}">
+                            @csrf
+                            <button type="submit" class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+                                Sync to Latest Version
+                            </button>
+                        </form>
+
                         <form method="POST" action="{{ route('support-updates.acknowledge') }}">
                             @csrf
                             <button type="submit" class="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900">

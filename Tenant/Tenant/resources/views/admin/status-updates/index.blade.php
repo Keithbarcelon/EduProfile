@@ -1,5 +1,7 @@
 @php
     $roleLabel = \App\Enums\UserRole::labels()[auth()->user()->role] ?? 'Staff';
+    $statusStudentsJson = e(json_encode($statusChangeStudents ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT));
+    $allowedStatusesJson = e(json_encode($allowedStatuses ?? [], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT));
     $categoryStyles = [
         'regular' => 'bg-sky-50 text-sky-700 border-sky-100',
         'affirmative' => 'bg-emerald-50 text-emerald-700 border-emerald-100',
@@ -49,6 +51,18 @@
                 </form>
             </div>
 
+            @if(($allowedStatuses ?? collect())->isNotEmpty() && ($statusChangeStudents ?? collect())->isNotEmpty())
+            <div class="border-b border-slate-100 p-6">
+                <div
+                    id="set-student-status-app"
+                    data-students="{{ $statusStudentsJson }}"
+                    data-allowed-statuses="{{ $allowedStatusesJson }}"
+                    data-role-label="{{ $roleLabel }}"
+                    data-endpoint-template="{{ url('/api/students/__STUDENT_ID__/status') }}"
+                ></div>
+            </div>
+            @endif
+
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
@@ -92,7 +106,7 @@
 
         <div class="admin-panel flex flex-col rounded-2xl bg-white shadow-sm overflow-hidden">
             <div class="border-b border-slate-100 px-6 py-4">
-                <h2 class="text-base font-semibold text-slate-800">Status Change Requests</h2>
+                <h2 class="text-base font-semibold text-slate-800">Status Change History</h2>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
@@ -100,102 +114,49 @@
                         <tr>
                             <th class="px-6 py-4 text-left font-semibold">Student</th>
                             <th class="px-6 py-4 text-left font-semibold">Change</th>
-                            <th class="px-6 py-4 text-left font-semibold">Initiated By</th>
-                            <th class="px-6 py-4 text-left font-semibold">Pending Role</th>
-                            <th class="px-6 py-4 text-left font-semibold">Approval</th>
-                            <th class="px-6 py-4 text-right font-semibold">Actions</th>
+                            <th class="px-6 py-4 text-left font-semibold">Changed By</th>
+                            <th class="px-6 py-4 text-left font-semibold">Role</th>
+                            <th class="px-6 py-4 text-left font-semibold">Reason</th>
+                            <th class="px-6 py-4 text-left font-semibold">Date</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        @forelse($updates as $update)
+                        @forelse(($historyEntries ?? collect()) as $entry)
                         <tr class="hover:bg-slate-50/50 transition-colors">
                             <td class="px-6 py-4">
-                                <p class="font-semibold text-slate-800">{{ $update->student->full_name }}</p>
-                                <p class="text-xs text-slate-500">{{ $update->student->student_id }}</p>
+                                <p class="font-semibold text-slate-800">{{ $entry->student->full_name ?? 'Student removed' }}</p>
+                                <p class="text-xs text-slate-500">{{ $entry->student->student_id ?? '-' }}</p>
                             </td>
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-slate-400 line-through">{{ ucfirst($update->old_status ?? 'n/a') }}</span>
+                                    <span class="text-slate-400 line-through">{{ ucfirst($entry->old_status ?? 'n/a') }}</span>
                                     <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-                                    <span class="tenant-primary-text font-medium">{{ ucfirst($update->new_status) }}</span>
+                                    <span class="tenant-primary-text font-medium">{{ ucfirst($entry->new_status) }}</span>
                                 </div>
                             </td>
                             <td class="px-6 py-4">
-                                <p class="text-slate-700">{{ $update->initiator->name ?? 'System' }}</p>
-                                <p class="text-[10px] uppercase text-slate-400">{{ $update->created_at->format('M d, Y h:i A') }}</p>
+                                <p class="text-slate-700">{{ $entry->changer->name ?? 'System' }}</p>
                             </td>
                             <td class="px-6 py-4 text-slate-600">
-                                @if($update->approval_status === 'pending' && $update->required_role_slug)
-                                    {{ str($update->required_role_slug)->replace('_', ' ')->title() }}
-                                @else
-                                    <span class="text-xs text-slate-400">-</span>
-                                @endif
+                                {{ str((string) ($entry->role ?? 'n/a'))->replace('_', ' ')->title() }}
                             </td>
-                            <td class="px-6 py-4 text-slate-600">{{ ucfirst($update->approval_status) }}</td>
-                            <td class="px-6 py-4 text-right">
-                                @if($update->approval_status === 'pending')
-                                    @can('approve', $update)
-                                    <div class="flex justify-end gap-2">
-                                        <form method="POST" action="{{ route('admin.status-updates.approve', $update) }}">
-                                            @csrf
-                                            <button type="submit" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700">Approve</button>
-                                        </form>
-                                        <button type="button" @click="$dispatch('open-modal', 'reject-{{ $update->id }}')" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">Reject</button>
-                                    </div>
-
-                                    <x-modal name="reject-{{ $update->id }}" :show="false" focusable>
-                                        <form method="POST" action="{{ route('admin.status-updates.reject', $update) }}" class="p-6">
-                                            @csrf
-                                            <h2 class="text-lg font-medium text-slate-900">Reject Status Update</h2>
-                                            <p class="mt-1 text-sm text-slate-600">Provide the reason for rejecting this request.</p>
-                                            <div class="mt-4">
-                                                <textarea name="rejection_reason" required class="tenant-focus-ring w-full rounded-xl border-slate-300 shadow-sm"></textarea>
-                                            </div>
-                                            <div class="mt-6 flex justify-end gap-3">
-                                                <button type="button" x-on:click="$dispatch('close')" class="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">Cancel</button>
-                                                <button type="submit" class="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Reject Request</button>
-                                            </div>
-                                        </form>
-                                    </x-modal>
-                                    @else
-                                    <span class="text-xs text-slate-400">Awaiting review</span>
-                                    @endcan
-                                @else
-                                <span class="text-xs text-slate-400">{{ $update->approver->name ?? 'Processed' }}</span>
-                                @endif
-
-                                @if(!empty($update->approval_audit))
-                                <div class="mt-2 text-left">
-                                    <details class="group inline-block text-xs text-slate-500">
-                                        <summary class="cursor-pointer list-none font-medium text-slate-500 hover:text-slate-700">Audit Timeline ({{ count((array) $update->approval_audit) }})</summary>
-                                        <div class="mt-2 max-h-36 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-600">
-                                            @foreach((array) $update->approval_audit as $audit)
-                                                <p>
-                                                    <span class="font-semibold">{{ str((string) ($audit['action'] ?? 'event'))->replace('_', ' ')->title() }}</span>
-                                                    · {{ \Illuminate\Support\Carbon::parse((string) ($audit['at'] ?? now()))->format('M d, Y h:i A') }}
-                                                    @if(!empty($audit['by_role']))
-                                                        · {{ str((string) $audit['by_role'])->replace('_', ' ')->title() }}
-                                                    @endif
-                                                </p>
-                                            @endforeach
-                                        </div>
-                                    </details>
-                                </div>
-                                @endif
+                            <td class="px-6 py-4 text-slate-600">
+                                <p class="line-clamp-2 max-w-md">{{ $entry->reason }}</p>
                             </td>
+                            <td class="px-6 py-4 text-slate-600">{{ $entry->created_at?->format('M d, Y h:i A') }}</td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-12 text-center text-slate-400">No status requests found.</td>
+                            <td colspan="6" class="px-6 py-12 text-center text-slate-400">No status changes recorded yet.</td>
                         </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
 
-            @if($updates->hasPages())
+            @if(($historyEntries ?? collect()) instanceof \Illuminate\Contracts\Pagination\Paginator && $historyEntries->hasPages())
             <div class="border-t border-slate-100 px-6 py-4 bg-slate-50/30">
-                {{ $updates->links() }}
+                {{ $historyEntries->links() }}
             </div>
             @endif
         </div>

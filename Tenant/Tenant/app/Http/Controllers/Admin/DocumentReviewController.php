@@ -18,7 +18,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use Throwable;
 
 class DocumentReviewController extends Controller
 {
@@ -183,12 +182,8 @@ class DocumentReviewController extends Controller
     {
         return strtolower(trim(preg_replace('/\s+/', ' ', $name) ?? ''));
     }
-
-    private function applyRoleVisibilityConstraints(Builder $query, User $user): void
-    {
-        // If review access was explicitly granted via direct permission assignment,
-        // allow tenant-wide review visibility.
-        if ($this->hasDirectDocumentReviewPermission($user)) {
+}
+view_documents')) {
             return;
         }
 
@@ -205,15 +200,6 @@ class DocumentReviewController extends Controller
                 $studentQuery->where('status_category', 'probation')
                     ->where('department_id', $user->department_id ?? 0);
             });
-        }
-    }
-
-    private function hasDirectDocumentReviewPermission(User $user): bool
-    {
-        try {
-            return $user->permissions()->where('slug', 'review_documents')->exists();
-        } catch (Throwable) {
-            return false;
         }
     }
 }

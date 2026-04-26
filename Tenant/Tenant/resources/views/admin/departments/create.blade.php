@@ -1,14 +1,18 @@
-@php
-    $roleLabel = \App\Enums\UserRole::labels()[auth()->user()->role] ?? 'Tenant Admin';
-@endphp
 <x-layouts.admin :pageTitle="'Create Department'" :role="$roleLabel">
-    <x-slot name="breadcrumb">
+    <x-slot:breadcrumbs>
+        <a href="{{ route('admin.dashboard') }}" class="text-slate-500 hover:text-slate-700">Dashboard</a>
+        <x-heroicon-o-chevron-right class="h-4 w-4 text-slate-400" />
         <a href="{{ route('admin.departments.index') }}" class="text-slate-500 hover:text-slate-700">Departments</a>
-        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-        <span class="text-slate-600">Create</span>
-    </x-slot>
+        <x-heroicon-o-chevron-right class="h-4 w-4 text-slate-400" />
+        <span class="text-slate-600">Create Department</span>
+    </x-slot:breadcrumbs>
 
-    <div class="mx-auto w-full max-w-3xl rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+    <div class="mx-auto max-w-4xl">
+        <div class="mb-6">
+            <h2 class="text-2xl font-bold text-slate-900">Create New Department</h2>
+            <p class="mt-1 text-sm text-slate-500">Add a new department unit to the tenant.</p>
+        </div>
+
         <form method="POST" action="{{ route('admin.departments.store') }}" class="space-y-5">
             @csrf
             @include('admin.departments.partials.form', ['department' => null, 'selectedFacultyIds' => []])

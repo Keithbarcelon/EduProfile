@@ -168,6 +168,43 @@ class UpdateCheckerService
         $tenantUpdate->save();
     }
 
+    public function syncCurrentVersionToLatest(School $school): array
+    {
+        $centralTenantId = $this->resolveCentralSchoolId($school);
+
+        if (! $centralTenantId) {
+            throw new \RuntimeException('Unable to resolve tenant mapping in central database.');
+        }
+
+        $latestInfo = $this->getLatestVersionInfo();
+        $latestVersion = trim((string) ($latestInfo['version'] ?? ''));
+
+        if ($latestVersion === '') {
+            throw new \RuntimeException('No latest release version is currently available to sync.');
+        }
+
+        $tenantUpdate = TenantUpdate::query()->firstOrNew(['tenant_id' => $centralTenantId]);
+        $tenantUpdate->fill([
+            'current_version' => $latestVersion,
+            'last_checked_at' => now(),
+            'latest_seen_version' => $latestVersion,
+            'acknowledged_at' => now(),
+        ]);
+        $tenantUpdate->save();
+
+        DB::connection('central')->table('schools')
+            ->where('id', $centralTenantId)
+            ->update([
+                'version' => $latestVersion,
+                'updated_at' => now(),
+            ]);
+
+        return [
+            'version' => $latestVersion,
+            'source' => (string) ($latestInfo['source'] ?? 'unknown'),
+        ];
+    }
+
     public function resolveCentralSchoolId(School $tenantSchool): ?int
     {
         $table = 'schools';

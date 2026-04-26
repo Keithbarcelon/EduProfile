@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Database\Connection;
 use InvalidArgumentException;
 
 class TenantDatabaseProvisioner
@@ -151,7 +152,202 @@ class TenantDatabaseProvisioner
             ]));
         }
 
+        $adminUserId = (int) ($conn->table('users')->where('email', $adminEmail)->value('id') ?? 0);
+
+        $this->seedTenantRbacData($conn, $schoolId, $adminUserId, $now);
+
         DB::purge($connectionName);
+    }
+
+    private function seedTenantRbacData(Connection $conn, int $schoolId, int $adminUserId, Carbon $now): void
+    {
+        $schema = $conn->getSchemaBuilder();
+
+        if (! $schema->hasTable('permissions') || ! $schema->hasTable('roles')) {
+            return;
+        }
+
+        $permissionDefinitions = [
+            ['name' => 'Manage Students', 'slug' => 'manage_students', 'module' => 'Students', 'description' => 'Create, edit, and manage student records'],
+            ['name' => 'View Reports', 'slug' => 'view_reports', 'module' => 'Reports', 'description' => 'View and export reports'],
+            ['name' => 'Manage Users', 'slug' => 'manage_users', 'module' => 'Users', 'description' => 'Create, edit, and remove user accounts'],
+            ['name' => 'Manage Departments', 'slug' => 'manage_departments', 'module' => 'Departments', 'description' => 'Create and maintain department records'],
+            ['name' => 'Manage Settings', 'slug' => 'manage_settings', 'module' => 'Settings', 'description' => 'Update tenant settings and preferences'],
+            ['name' => 'Manage Status Updates', 'slug' => 'manage_status_updates', 'module' => 'Status Monitoring', 'description' => 'Submit, review, and approve student status updates'],
+            ['name' => 'Review Documents', 'slug' => 'review_documents', 'module' => 'Document Reviews', 'description' => 'Review and process student document submissions'],
+            ['name' => 'Manage Profiles', 'slug' => 'manage_profiles', 'module' => 'Users', 'description' => 'Manage users, departments, and settings'],
+            ['name' => 'Manage Tenant', 'slug' => 'manage_tenant', 'module' => 'Tenant', 'description' => 'Manage tenant operational controls'],
+            ['name' => 'Manage Roles', 'slug' => 'manage_roles', 'module' => 'RBAC', 'description' => 'Create roles and assign permissions'],
+            ['name' => 'Manage Support', 'slug' => 'manage_support', 'module' => 'Support', 'description' => 'Create and process support tickets'],
+        ];
+
+        $permissionIdsBySlug = [];
+
+        foreach ($permissionDefinitions as $definition) {
+            $existing = $conn->table('permissions')->where('slug', $definition['slug'])->first();
+
+            if ($existing) {
+                $conn->table('permissions')->where('id', (int) $existing->id)->update([
+                    'name' => $definition['name'],
+                    'module' => $definition['module'],
+                    'description' => $definition['description'],
+                    'updated_at' => $now,
+                ]);
+
+                $permissionIdsBySlug[$definition['slug']] = (int) $existing->id;
+            } else {
+                $permissionIdsBySlug[$definition['slug']] = (int) $conn->table('permissions')->insertGetId([
+                    'name' => $definition['name'],
+                    'slug' => $definition['slug'],
+                    'module' => $definition['module'],
+                    'description' => $definition['description'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+        }
+
+        $rolePermissionMap = [
+            'tenant-admin' => ['manage_students', 'view_reports', 'manage_users', 'manage_departments', 'manage_settings', 'manage_status_updates', 'review_documents', 'manage_profiles', 'manage_tenant', 'manage_roles', 'manage_support'],
+            'admission' => ['manage_students', 'view_reports', 'manage_status_updates', 'review_documents'],
+            'faculty' => ['manage_students', 'manage_status_updates', 'review_documents'],
+            'student' => [],
+        ];
+
+        $roleIdsBySlug = [];
+
+        foreach ($rolePermissionMap as $roleSlug => $permissionSlugs) {
+            $roleName = str_replace('-', ' ', $roleSlug);
+            $roleName = ucwords($roleName);
+
+            $existingRole = $conn->table('roles')
+                ->where('school_id', $schoolId)
+                ->where('slug', $roleSlug)
+                ->first();
+
+            if ($existingRole) {
+                $roleId = (int) $existingRole->id;
+
+                $conn->table('roles')->where('id', $roleId)->update([
+                    'name' => $roleName,
+                    'description' => 'System role',
+                    'is_system' => true,
+                    'updated_at' => $now,
+                ]);
+            } else {
+                $roleId = (int) $conn->table('roles')->insertGetId([
+                    'school_id' => $schoolId,
+                    'name' => $roleName,
+                    'slug' => $roleSlug,
+                    'description' => 'System role',
+                    'is_system' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+
+            $roleIdsBySlug[$roleSlug] = $roleId;
+
+            if ($schema->hasTable('role_permission')) {
+                $targetPermissionIds = [];
+
+                foreach ($permissionSlugs as $permissionSlug) {
+                    if (isset($permissionIdsBySlug[$permissionSlug])) {
+                        $targetPermissionIds[] = (int) $permissionIdsBySlug[$permissionSlug];
+                    }
+                }
+
+                $existingPermissionIds = $conn->table('role_permission')
+                    ->where('role_id', $roleId)
+                    ->pluck('permission_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+
+                $toAttach = array_diff($targetPermissionIds, $existingPermissionIds);
+                $toDetach = array_diff($existingPermissionIds, $targetPermissionIds);
+
+                if (! empty($toAttach)) {
+                    $rows = [];
+
+                    foreach ($toAttach as $permissionId) {
+                        $rows[] = [
+                            'role_id' => $roleId,
+                            'permission_id' => (int) $permissionId,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                    }
+
+                    $conn->table('role_permission')->insert($rows);
+                }
+
+                if (! empty($toDetach)) {
+                    $conn->table('role_permission')
+                        ->where('role_id', $roleId)
+                        ->whereIn('permission_id', $toDetach)
+                        ->delete();
+                }
+            }
+        }
+
+        if ($schema->hasTable('user_role')) {
+            if ($adminUserId > 0 && isset($roleIdsBySlug['tenant-admin'])) {
+                $tenantAdminRoleId = (int) $roleIdsBySlug['tenant-admin'];
+
+                $pivotExists = $conn->table('user_role')
+                    ->where('user_id', $adminUserId)
+                    ->where('role_id', $tenantAdminRoleId)
+                    ->exists();
+
+                if (! $pivotExists) {
+                    $conn->table('user_role')->insert([
+                        'user_id' => $adminUserId,
+                        'role_id' => $tenantAdminRoleId,
+                        'assigned_by' => null,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
+            }
+
+            $legacyToRole = [
+                'admin' => 'tenant-admin',
+                'tenant_admin' => 'tenant-admin',
+                'admission' => 'admission',
+                'department' => 'department',
+                'faculty' => 'faculty',
+                'student' => 'student',
+            ];
+
+            $users = $conn->table('users')
+                ->where('school_id', $schoolId)
+                ->select('id', 'role')
+                ->get();
+
+            foreach ($users as $user) {
+                $legacyRole = (string) ($user->role ?? '');
+                $targetRoleSlug = $legacyToRole[$legacyRole] ?? null;
+
+                if (! $targetRoleSlug || ! isset($roleIdsBySlug[$targetRoleSlug])) {
+                    continue;
+                }
+
+                $pivotExists = $conn->table('user_role')
+                    ->where('user_id', (int) $user->id)
+                    ->where('role_id', (int) $roleIdsBySlug[$targetRoleSlug])
+                    ->exists();
+
+                if (! $pivotExists) {
+                    $conn->table('user_role')->insert([
+                        'user_id' => (int) $user->id,
+                        'role_id' => (int) $roleIdsBySlug[$targetRoleSlug],
+                        'assigned_by' => null,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
+            }
+        }
     }
 
     private function configureTenantConnection(string $databaseName): string

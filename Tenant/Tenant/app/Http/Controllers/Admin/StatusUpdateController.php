@@ -4,9 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Enums\UserRole;
+use App\Models\Status;
+use App\Models\StudentStatusHistory;
 use App\Models\StatusUpdate;
 use App\Models\Student;
+use App\Support\StudentStatusRules;
 use App\Support\TenantConfig;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,21 +27,21 @@ class StatusUpdateController extends Controller
         $user = Auth::user();
         $schoolId = (int) app('currentSchool')->id;
 
-        $updates = StatusUpdate::query()
-            ->where('school_id', $schoolId)
-            ->with(['student', 'initiator', 'approver'])
-            ->when(in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value]), function ($query) use ($user) {
-                $query->whereHas('student', function ($studentQuery) use ($user) {
-                    $studentQuery->where('department_id', $user->department_id ?? 0);
-                });
-            })
-            ->latest()
-            ->paginate(15);
-
         $students = Student::query()
             ->where('school_id', $schoolId)
             ->with('department')
-            ->when(in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value]), fn ($query) => $query->where('department_id', $user->department_id ?? 0))
+            ->when(in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value]), function ($query) use ($user) {
+                $departmentId = $user->department_id;
+
+                $query->where(function ($builder) use ($departmentId) {
+                    if ($departmentId !== null) {
+                        $builder->where('department_id', $departmentId)
+                            ->orWhereNull('department_id');
+                    } else {
+                        $builder->whereNull('department_id');
+                    }
+                });
+            })
             ->when(request()->filled('status_category'), fn ($query) => $query->where('status_category', (string) request()->input('status_category')))
             ->latest()
             ->paginate(12, ['*'], 'students_page')
@@ -49,7 +53,71 @@ class StatusUpdateController extends Controller
             ->groupBy('status_category')
             ->pluck('total', 'status_category');
 
-        return view('admin.status-updates.index', compact('updates', 'students', 'statusCategoryCounts'));
+        $allowedStatuses = collect();
+        if (Schema::hasTable('statuses')) {
+            $allowedStatusNames = StudentStatusRules::allowedStatusNamesForRole((string) $user->role);
+
+            $allowedStatuses = Status::query()
+                ->whereIn('name', $allowedStatusNames)
+                ->orderByRaw("CASE name WHEN 'regular' THEN 1 WHEN 'affirmative' THEN 2 WHEN 'probation' THEN 3 ELSE 99 END")
+                ->get(['id', 'name'])
+                ->map(fn (Status $status): array => [
+                    'id' => (int) $status->id,
+                    'name' => strtolower((string) $status->name),
+                    'label' => ucfirst((string) $status->name),
+                ])
+                ->values();
+        }
+
+        $statusChangeStudents = Student::query()
+            ->where('school_id', $schoolId)
+            ->when(in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value], true), function ($query) use ($user) {
+                $departmentId = $user->department_id;
+
+                $query->where(function ($builder) use ($departmentId) {
+                    if ($departmentId !== null) {
+                        $builder->where('department_id', $departmentId)
+                            ->orWhereNull('department_id');
+                    } else {
+                        $builder->whereNull('department_id');
+                    }
+                });
+            })
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->get(['id', 'student_id', 'first_name', 'middle_name', 'last_name', 'suffix'])
+            ->map(fn (Student $student): array => [
+                'id' => (int) $student->id,
+                'student_id' => (string) $student->student_id,
+                'full_name' => (string) $student->full_name,
+            ])
+            ->values();
+
+        $historyEntries = collect();
+        if (Schema::hasTable('student_status_history')) {
+            $historyEntries = StudentStatusHistory::query()
+                ->with(['student.department', 'changer'])
+                ->whereHas('student', function ($studentQuery) use ($schoolId, $user): void {
+                    $studentQuery->where('school_id', $schoolId)
+                        ->when(in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value], true), function ($query) use ($user): void {
+                            $departmentId = $user->department_id;
+
+                            $query->where(function ($builder) use ($departmentId): void {
+                                if ($departmentId !== null) {
+                                    $builder->where('department_id', $departmentId)
+                                        ->orWhereNull('department_id');
+                                } else {
+                                    $builder->whereNull('department_id');
+                                }
+                            });
+                        });
+                })
+                ->latest('created_at')
+                ->paginate(15, ['*'], 'history_page')
+                ->withQueryString();
+        }
+
+        return view('admin.status-updates.index', compact('students', 'statusCategoryCounts', 'allowedStatuses', 'statusChangeStudents', 'historyEntries'));
     }
 
     /**

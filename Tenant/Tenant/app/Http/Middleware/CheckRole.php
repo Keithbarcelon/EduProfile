@@ -5,7 +5,6 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
-use App\Enums\UserRole;
 
 class CheckRole
 {
@@ -23,13 +22,21 @@ class CheckRole
             return redirect()->route('login');
         }
 
-        // Handle administrative role aliases
-        $effectiveRoles = $roles;
-        if (in_array('tenant_admin', $roles)) {
-            $effectiveRoles[] = 'admin';
+        $requiredRoles = collect($roles)
+            ->map(fn (string $role): string => str_replace('-', '_', strtolower(trim($role))))
+            ->filter(fn (string $role): bool => $role !== '')
+            ->values()
+            ->all();
+
+        if (in_array('tenant_admin', $requiredRoles, true) && ! in_array('admin', $requiredRoles, true)) {
+            $requiredRoles[] = 'admin';
         }
 
-        if (! in_array($user->role, $effectiveRoles)) {
+        if (in_array('admin', $requiredRoles, true) && ! in_array('tenant_admin', $requiredRoles, true)) {
+            $requiredRoles[] = 'tenant_admin';
+        }
+
+        if (! $user->hasAnyRoleSlug($requiredRoles)) {
             abort(403, 'Unauthorized. You do not have the required role for this action.');
         }
 

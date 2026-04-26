@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Traits\BelongsToSchool;
+use App\Traits\HasDepartmentScope;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\Schema;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, BelongsToSchool;
+    use HasFactory, Notifiable, BelongsToSchool, HasDepartmentScope;
 
     /**
      * The attributes that are mass assignable.
@@ -162,6 +163,71 @@ class User extends Authenticatable
     }
 
     /**
+     * @return list<string>
+     */
+    public function effectiveRoleSlugs(): array
+    {
+        $roles = [];
+
+        $legacyRole = $this->normalizeRoleSlug((string) $this->role);
+        if ($legacyRole !== '') {
+            $roles[] = $legacyRole;
+        }
+
+        if ($this->rbacRoleTablesAvailable()) {
+            try {
+                $rbacRoleSlugs = $this->roles()
+                    ->pluck('slug')
+                    ->map(fn ($slug) => $this->normalizeRoleSlug((string) $slug))
+                    ->filter(fn ($slug) => $slug !== '')
+                    ->values()
+                    ->all();
+
+                $roles = array_merge($roles, $rbacRoleSlugs);
+            } catch (QueryException) {
+                // Keep legacy role-only behavior when RBAC queries fail.
+            }
+        }
+
+        $roles = array_values(array_unique($roles));
+
+        // Normalize admin aliases so checks can match either format.
+        if (in_array('tenant_admin', $roles, true) && ! in_array('admin', $roles, true)) {
+            $roles[] = 'admin';
+        }
+
+        if (in_array('admin', $roles, true) && ! in_array('tenant_admin', $roles, true)) {
+            $roles[] = 'tenant_admin';
+        }
+
+        return array_values(array_unique($roles));
+    }
+
+    /**
+     * @param list<string> $requiredRoles
+     */
+    public function hasAnyRoleSlug(array $requiredRoles): bool
+    {
+        $required = collect($requiredRoles)
+            ->map(fn ($role) => $this->normalizeRoleSlug((string) $role))
+            ->filter(fn ($role) => $role !== '')
+            ->values()
+            ->all();
+
+        if ($required === []) {
+            return true;
+        }
+
+        foreach ($this->effectiveRoleSlugs() as $roleSlug) {
+            if (in_array($roleSlug, $required, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Resolve the owned student profile, including legacy records linked only by email.
      */
     public function resolveStudentProfile(): ?Student
@@ -197,9 +263,29 @@ class User extends Authenticatable
             && Schema::hasTable('user_role');
     }
 
+    private function rbacRoleTablesAvailable(): bool
+    {
+        return Schema::hasTable('roles')
+            && Schema::hasTable('user_role');
+    }
+
     private function directPermissionTablesAvailable(): bool
     {
         return Schema::hasTable('permissions')
             && Schema::hasTable('user_permission');
+    }
+
+    private function normalizeRoleSlug(string $role): string
+    {
+        $normalized = strtolower(trim($role));
+        if ($normalized === '') {
+            return '';
+        }
+
+        $normalized = str_replace('-', '_', $normalized);
+
+        return $normalized === 'tenantadmin'
+            ? 'tenant_admin'
+            : $normalized;
     }
 }
