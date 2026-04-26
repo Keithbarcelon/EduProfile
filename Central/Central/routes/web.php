@@ -11,8 +11,13 @@ use App\Http\Controllers\Developer\SupportRequestController;
 use App\Http\Controllers\TenantSignupController;
 use Illuminate\Support\Facades\Route;
 
+// ── Tenant Domain Routing ──────────────────────────────────────────────────
+Route::domain('{tenant}.localhost', function ($tenant) {
+    return view('tenants.landing', ['domain' => $tenant]);
+});
+
 Route::get('/', function () {
-    return view('welcome');
+    return view('landing');
 });
 
 // ── Tenant Signup Routes (School Registration) ──────────────────────────────
