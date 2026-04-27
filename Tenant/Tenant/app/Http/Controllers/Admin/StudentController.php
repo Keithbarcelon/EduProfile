@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
+use RuntimeException;
 use Illuminate\View\View;
 
 class StudentController extends Controller
@@ -31,12 +32,20 @@ class StudentController extends Controller
         $user = $request->user();
         $schoolId = (int) app('currentSchool')->id;
 
-        $students = Student::query()
+        $scopedStudents = Student::query()
             ->where('school_id', $schoolId)
+            ->when(in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value], true), function ($query) use ($user) {
+                if ($user->department_id === null) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                $query->where('department_id', $user->department_id);
+            });
+
+        $students = (clone $scopedStudents)
             ->with(['department', 'user'])
-            ->when(in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value]), function ($query) use ($user) {
-                $query->where('department_id', $user->department_id ?? 0);
-            })
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('student_id', 'like', "%{$search}%")
@@ -56,10 +65,10 @@ class StudentController extends Controller
             ->get();
 
         $overview = [
-            'total' => Student::query()->where('school_id', $schoolId)->count(),
-            'regular' => Student::query()->where('school_id', $schoolId)->where('status_category', 'regular')->count(),
-            'affirmative' => Student::query()->where('school_id', $schoolId)->where('status_category', 'affirmative')->count(),
-            'probation' => Student::query()->where('school_id', $schoolId)->where('status_category', 'probation')->count(),
+            'total' => (clone $scopedStudents)->count(),
+            'regular' => (clone $scopedStudents)->where('status_category', 'regular')->count(),
+            'affirmative' => (clone $scopedStudents)->where('status_category', 'affirmative')->count(),
+            'probation' => (clone $scopedStudents)->where('status_category', 'probation')->count(),
         ];
 
         $unlinkedStudentUsers = User::query()
@@ -162,9 +171,18 @@ class StudentController extends Controller
         $this->authorize('update', $student);
 
         $validated = $request->validated();
+        if ($request->hasFile('profile_image')) {
+            $validated['profile_image'] = $request->file('profile_image');
+        }
         $schoolId = (int) app('currentSchool')->id;
 
-        $this->studentProfileService->updateStudentProfile($student, $validated, $schoolId);
+        try {
+            $this->studentProfileService->updateStudentProfile($student, $validated, $schoolId);
+        } catch (RuntimeException $exception) {
+            return back()
+                ->withInput()
+                ->with('error', $exception->getMessage());
+        }
 
         return redirect()->route('admin.students.show', $student)
             ->with('success', 'Student record updated successfully.');

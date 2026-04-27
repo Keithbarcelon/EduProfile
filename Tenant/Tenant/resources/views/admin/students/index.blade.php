@@ -155,9 +155,13 @@
                         <tr class="transition-colors hover:bg-slate-50">
                             <td class="px-6 py-3">
                                 <div class="flex items-center gap-3">
-                                    <div class="tenant-primary-soft-bg tenant-primary-text flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
-                                        {{ strtoupper(substr($student->first_name, 0, 1) . substr($student->last_name, 0, 1)) }}
-                                    </div>
+                                    @if(!empty($student->profile_image_path))
+                                        <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($student->profile_image_path) }}" alt="{{ $student->full_name }} photo" class="h-8 w-8 rounded-full border border-slate-200 object-cover shrink-0">
+                                    @else
+                                        <div class="tenant-primary-soft-bg tenant-primary-text flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+                                            {{ strtoupper(substr($student->first_name, 0, 1) . substr($student->last_name, 0, 1)) }}
+                                        </div>
+                                    @endif
                                     <div>
                                         <p class="font-medium text-slate-800">{{ $student->full_name }}</p>
                                         <p class="text-xs text-slate-400">{{ $student->email }}</p>

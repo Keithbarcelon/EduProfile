@@ -23,7 +23,7 @@ class UpdateTenantSubscriptionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'plan_type' => ['required', Rule::in(['basic', 'pro'])],
+            'plan_type' => ['required', Rule::in(['basic', 'standard', 'premium'])],
             'plan_started_at' => ['required', 'date'],
             'plan_due_at' => ['required', 'date', 'after_or_equal:plan_started_at'],
             'plan_expiration_email' => ['required', 'email', 'max:255'],

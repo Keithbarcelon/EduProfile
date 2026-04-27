@@ -12,6 +12,12 @@
             </div>
         @endif
 
+        @if(session('error'))
+            <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {{ session('error') }}
+            </div>
+        @endif
+
         @if($errors->any())
             <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                 Please review the upload form and try again.
@@ -108,6 +114,7 @@
                                 <th class="px-6 py-3 text-left">Status</th>
                                 <th class="px-6 py-3 text-left">Remarks</th>
                                 <th class="px-6 py-3 text-left">File</th>
+                                <th class="px-6 py-3 text-left">Action</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -137,10 +144,23 @@
                                         View File
                                     </a>
                                 </td>
+                                <td class="px-6 py-4">
+                                    @if($doc->status === 'approved')
+                                        <span class="text-[11px] font-semibold text-slate-500">Locked after approval</span>
+                                    @else
+                                        <form method="POST" action="{{ route('student.documents.destroy', $doc) }}" onsubmit="return confirm('Remove this uploaded file?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-100">
+                                                Remove
+                                            </button>
+                                        </form>
+                                    @endif
+                                </td>
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="4" class="px-6 py-10 text-center text-slate-400 italic">
+                                <td colspan="5" class="px-6 py-10 text-center text-slate-400 italic">
                                     No documents submitted yet.
                                 </td>
                             </tr>

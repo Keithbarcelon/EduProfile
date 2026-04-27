@@ -30,7 +30,8 @@ class SendTenantSubscriptionReminders extends Command
     {
         $days = max((int) $this->option('days'), 1);
 
-        $tenants = School::query()
+        $tenants = School::on('central')
+            ->newQuery()
             ->whereNotNull('plan_expiration_email')
             ->whereNotNull('plan_due_at')
             ->get();

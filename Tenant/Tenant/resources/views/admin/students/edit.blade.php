@@ -43,7 +43,7 @@
                 <span class="sm:ml-auto inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">Linked Profile</span>
             </div>
 
-            <form id="update-student-form" method="POST" action="{{ route('admin.students.update', $student) }}" class="p-6 space-y-6">
+            <form id="update-student-form" method="POST" action="{{ route('admin.students.update', $student) }}" enctype="multipart/form-data" class="p-6 space-y-6">
                 @csrf
                 @method('PATCH')
 
@@ -67,11 +67,8 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">
                                 Student ID <span class="text-red-500">*</span>
                             </label>
-                            <input type="text" name="student_id" value="{{ old('student_id', $student->student_id) }}"
-                            class="tenant-focus-ring w-full text-sm rounded-xl border-slate-300 bg-white @error('student_id') border-red-400 @enderror">
-                            @error('student_id')
-                            <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
-                            @enderror
+                            <input type="text" value="{{ $student->student_id }}" readonly class="w-full cursor-not-allowed text-sm rounded-xl border-slate-200 bg-slate-100 text-slate-600">
+                            <p class="mt-1 text-xs text-slate-500">Student ID is managed by the system and cannot be customized.</p>
                         </div>
                         <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">
@@ -108,6 +105,20 @@
                             @error('suffix')
                             <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
                             @enderror
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Student Photo</label>
+                            <input type="file" name="profile_image" accept="image/png,image/jpeg,image/jpg,image/webp" class="tenant-focus-ring w-full text-sm rounded-xl border-slate-300 bg-white @error('profile_image') border-red-400 @enderror">
+                            <p class="mt-1 text-xs text-slate-500">Allowed: JPG, PNG, WEBP. Max 4MB.</p>
+                            @error('profile_image')
+                            <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                            @enderror
+                            @if(!empty($student->profile_image_path))
+                            <div class="mt-2 flex items-center gap-3">
+                                <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($student->profile_image_path) }}" alt="Current student photo" class="h-14 w-14 rounded-xl border border-slate-200 object-cover">
+                                <p class="text-xs text-slate-500">Current photo</p>
+                            </div>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -334,7 +345,7 @@
                                 $visibleStatuses = collect((array) ($field['visible_statuses'] ?? []))->map(fn ($value) => strtolower(trim((string) $value)))->filter()->values();
                                 $currentValue = old('custom_fields.' . $fieldKey, $customFieldValueMap[$fieldKey] ?? '');
                             @endphp
-                            @if($fieldKey !== '')
+                            @if($fieldKey !== '' && strtolower($fieldKey) !== 'student_id')
                             <div class="{{ $fieldType === 'textarea' ? 'sm:col-span-2' : '' }} tenant-custom-field" data-visible-statuses="{{ $visibleStatuses->implode(',') }}">
                                 <label class="block text-sm font-medium text-slate-700 mb-1">
                                     {{ $fieldLabel }}

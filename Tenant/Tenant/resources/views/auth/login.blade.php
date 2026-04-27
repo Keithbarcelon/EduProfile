@@ -131,7 +131,7 @@
                     <a href="{{ route('landing') }}" class="ep-logo text-decoration-none">{{ $schoolInitial }}</a>
                 @endif
                 <h1 class="h2 mt-3 mb-1 fw-bold">{{ $schoolName }}</h1>
-                <p class="ep-muted mb-0">Sign in to access your academic workspace.</p>
+                <p class="ep-muted mb-0">Sign in to your school portal.</p>
             </div>
 
             @if ($errors->any())
@@ -176,10 +176,10 @@
                     @endif
                 </div>
 
-                <button type="submit" class="btn ep-btn w-100">Login to Tenant Portal</button>
+                <button type="submit" class="btn ep-btn w-100">Sign In</button>
             </form>
 
-            <p class="small ep-muted text-center mt-4 mb-0">Secure access for admins, faculty, and students.</p>
+            <p class="small ep-muted text-center mt-4 mb-0">For school admins, faculty, and students.</p>
         </div>
     </main>
 </body>

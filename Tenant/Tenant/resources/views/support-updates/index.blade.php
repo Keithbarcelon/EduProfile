@@ -12,7 +12,7 @@
         <div class="rounded-3xl bg-gradient-to-r from-slate-900 via-cyan-900 to-emerald-800 px-6 py-6 text-white shadow-xl">
             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">Tenant Operations</p>
             <h2 class="mt-2 text-2xl font-bold">Support and Update Control Center</h2>
-            <p class="mt-2 max-w-3xl text-sm text-cyan-100/90">Check your tenant version against the latest release, acknowledge update notices, and submit support requests to central.</p>
+            <p class="mt-2 max-w-3xl text-sm text-cyan-100/90">Check your tenant version against the latest release, acknowledge update notices, and submit bug reports to central.</p>
         </div>
 
         @if(!empty($moduleError))
@@ -63,6 +63,13 @@
                     </button>
 
                     @if($isTenantAdmin)
+                        <form method="POST" action="{{ route('support-updates.sync-latest') }}">
+                            @csrf
+                            <button type="submit" class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+                                Sync to Latest Version
+                            </button>
+                        </form>
+
                         <form method="POST" action="{{ route('support-updates.acknowledge') }}">
                             @csrf
                             <button type="submit" class="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-900">
@@ -108,7 +115,7 @@
 
             <section class="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
                 <div class="mb-4 flex items-center justify-between">
-                    <h3 class="text-lg font-semibold text-slate-900">Submit Support Request</h3>
+                    <h3 class="text-lg font-semibold text-slate-900">Submit Bug Report</h3>
                     <span class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">Tenant Admin</span>
                 </div>
 
@@ -144,18 +151,18 @@
 
                     <div class="flex justify-end">
                         <button type="submit" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
-                            Submit Request
+                            Submit Bug Report
                         </button>
                     </div>
                 </form>
                 @else
-                    <p class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">Only tenant admins can submit support requests.</p>
+                    <p class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">Only tenant admins can submit bug reports.</p>
                 @endif
             </section>
         </div>
 
         <section class="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-            <h3 class="mb-4 text-lg font-semibold text-slate-900">Previous Support Requests</h3>
+            <h3 class="mb-4 text-lg font-semibold text-slate-900">Previous Bug Reports</h3>
             <div class="space-y-3">
                 @forelse($supportRequests as $supportRequest)
                     <article class="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -169,7 +176,7 @@
                         <p class="mt-2 text-xs text-slate-500">{{ $supportRequest->created_at?->format('M d, Y h:i A') }}</p>
                     </article>
                 @empty
-                    <p class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">No support requests submitted yet.</p>
+                    <p class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">No bug reports submitted yet.</p>
                 @endforelse
             </div>
 

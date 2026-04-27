@@ -7,6 +7,7 @@ use App\Http\Controllers\Developer\SupportTicketController;
 use App\Http\Controllers\Developer\TenantCustomizationController;
 use App\Http\Controllers\Developer\TenantController;
 use App\Http\Controllers\Developer\VersionManagementController;
+use App\Http\Controllers\Developer\SupportRequestController;
 use App\Http\Controllers\TenantSignupController;
 use Illuminate\Support\Facades\Route;
 
@@ -44,6 +45,12 @@ Route::middleware(['auth', 'verified', 'developer', 'central.only'])->prefix('de
     Route::patch('/plans/{plan}/active', [PlanController::class, 'setActive'])->name('plans.set-active');
     Route::resource('plans', PlanController::class)->except(['show']);
     Route::resource('support-tickets', SupportTicketController::class)->except(['show']);
+    Route::prefix('support-requests')->name('support-requests.')->group(function () {
+        Route::get('/', [SupportRequestController::class, 'index'])->name('index');
+        Route::get('/{supportRequest}', [SupportRequestController::class, 'show'])->name('show');
+        Route::patch('/{supportRequest}/status', [SupportRequestController::class, 'updateStatus'])->name('update-status');
+        Route::delete('/{supportRequest}', [SupportRequestController::class, 'destroy'])->name('destroy');
+    });
     Route::resource('app-updates', AppUpdateController::class)->except(['show']);
     Route::get('/version-management', [VersionManagementController::class, 'index'])->name('version-management.index');
     Route::post('/version-management/versions', [VersionManagementController::class, 'storeVersion'])->name('version-management.versions.store');

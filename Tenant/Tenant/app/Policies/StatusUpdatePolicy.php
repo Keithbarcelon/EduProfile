@@ -35,6 +35,16 @@ class StatusUpdatePolicy
                 $userRole = 'tenant_admin';
             }
 
+            if (in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value], true)) {
+                if ($user->department_id === null) {
+                    return false;
+                }
+
+                if ($statusUpdate->student->department_id !== $user->department_id) {
+                    return false;
+                }
+            }
+
             return $userRole === $requiredRole;
         }
 
@@ -48,11 +58,24 @@ class StatusUpdatePolicy
 
     public function update(User $user, StatusUpdate $statusUpdate): bool
     {
-        return $user->hasPermission('manage_status_updates');
+        if (! $user->hasPermission('manage_status_updates')) {
+            return false;
+        }
+
+        if (UserRole::isAdmin($user->role) || $user->role === UserRole::ADMISSION->value) {
+            return true;
+        }
+
+        if (in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value], true)) {
+            return $user->department_id !== null
+                && $statusUpdate->student->department_id === $user->department_id;
+        }
+
+        return false;
     }
 
     public function delete(User $user, StatusUpdate $statusUpdate): bool
     {
-        return $user->hasPermission('manage_status_updates');
+        return $this->update($user, $statusUpdate);
     }
 }

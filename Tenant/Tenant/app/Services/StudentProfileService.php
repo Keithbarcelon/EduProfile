@@ -7,9 +7,13 @@ use App\Models\Student;
 use App\Models\StudentCustomFieldValue;
 use App\Support\TenantConfig;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
+use RuntimeException;
 
 class StudentProfileService
 {
@@ -95,11 +99,38 @@ class StudentProfileService
     public function updateStudentProfile(Student $student, array $validated, int $schoolId): void
     {
         $validated['school_id'] = $schoolId;
+        $validated['student_id'] = (string) $student->student_id;
         $normalizedCustomFields = $this->sanitizeCustomFields((array) ($validated['custom_fields'] ?? []));
         $validated['custom_fields'] = $normalizedCustomFields;
+        $hasProfileImageColumn = Schema::connection($student->getConnectionName())
+            ->hasColumn($student->getTable(), 'profile_image_path');
 
-        DB::transaction(function () use ($student, $validated, $normalizedCustomFields, $schoolId) {
+        DB::transaction(function () use ($student, $validated, $normalizedCustomFields, $schoolId, $hasProfileImageColumn) {
+            $newProfileImagePath = $hasProfileImageColumn ? $student->profile_image_path : null;
+            $uploadedProfileImage = $validated['profile_image'] ?? null;
+
+            if ($uploadedProfileImage instanceof UploadedFile && ! $hasProfileImageColumn) {
+                throw new RuntimeException('Student photo upload is not ready yet. Run tenant migrations to add the profile_image_path column.');
+            }
+
+            if ($uploadedProfileImage instanceof UploadedFile) {
+                $newProfileImagePath = $uploadedProfileImage->store('student-profiles/' . $student->id, 'public');
+            }
+
+            unset($validated['profile_image']);
+            if ($hasProfileImageColumn) {
+                $validated['profile_image_path'] = $newProfileImagePath;
+            }
+
+            $oldProfileImagePath = $hasProfileImageColumn
+                ? (string) ($student->profile_image_path ?? '')
+                : '';
+
             $student->update($validated);
+
+            if ($uploadedProfileImage instanceof UploadedFile && $oldProfileImagePath !== '' && $oldProfileImagePath !== $newProfileImagePath) {
+                Storage::disk('public')->delete($oldProfileImagePath);
+            }
 
             if (Schema::hasTable('student_custom_field_values')) {
                 StudentCustomFieldValue::query()
@@ -134,9 +165,14 @@ class StudentProfileService
      */
     private function sanitizeCustomFields(array $submittedFields): array
     {
+        $reservedKeys = collect(['student_id'])
+            ->map(fn ($fieldKey) => strtolower(trim((string) $fieldKey)))
+            ->values();
+
         $allowedFields = collect(TenantConfig::studentCustomFields())
             ->pluck('field_key')
             ->map(fn ($fieldKey) => (string) $fieldKey)
+            ->reject(fn ($fieldKey) => $reservedKeys->contains(strtolower(trim($fieldKey))))
             ->filter()
             ->values();
 
@@ -199,4 +235,5 @@ class StudentProfileService
 
         return $candidate;
     }
+
 }

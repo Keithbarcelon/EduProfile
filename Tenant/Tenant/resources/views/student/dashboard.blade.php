@@ -305,6 +305,7 @@
                             <th class="px-4 py-3">Upload Date</th>
                             <th class="px-4 py-3">Status</th>
                             <th class="px-4 py-3">Remarks</th>
+                            <th class="px-4 py-3">Action</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 bg-white">
@@ -320,10 +321,23 @@
                                 <td class="px-4 py-4 text-slate-600">
                                     {{ $document->review_remarks ?: ($document->status === 'rejected' ? 'Rejected without remarks.' : 'No remarks yet.') }}
                                 </td>
+                                <td class="px-4 py-4">
+                                    @if($document->status === 'approved')
+                                        <span class="text-xs font-semibold text-slate-500">Locked</span>
+                                    @else
+                                        <form method="POST" action="{{ route('student.documents.destroy', $document) }}" onsubmit="return confirm('Remove this uploaded file?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="inline-flex rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100">
+                                                Remove
+                                            </button>
+                                        </form>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="px-4 py-10 text-center text-sm text-slate-500">
+                                <td colspan="5" class="px-4 py-10 text-center text-sm text-slate-500">
                                     No documents uploaded yet.
                                 </td>
                             </tr>

@@ -125,11 +125,15 @@ class UpdateCheckerService
             throw new \RuntimeException('Unable to resolve tenant mapping in central database.');
         }
 
-        $currentVersion = (string) ($school->version ?: config('app.version', 'v1.0.0'));
         $latestInfo = $this->getLatestVersionInfo();
         $latestVersion = $latestInfo['version'];
 
         $tenantUpdate = TenantUpdate::query()->firstOrNew(['tenant_id' => $centralTenantId]);
+
+        // Prefer an already persisted central "current_version" (e.g. after syncing)
+        // so that running "check" cannot regress the displayed version back to an older
+        // tenant-local value.
+        $currentVersion = (string) ($tenantUpdate->current_version ?: $school->version ?: config('app.version', 'v1.0.0'));
 
         $resetAcknowledge = $tenantUpdate->exists
             && (string) $tenantUpdate->latest_seen_version !== (string) $latestVersion;
@@ -166,6 +170,47 @@ class UpdateCheckerService
             'acknowledged_at' => now(),
         ]);
         $tenantUpdate->save();
+    }
+
+    public function syncCurrentVersionToLatest(School $school): array
+    {
+        $centralTenantId = $this->resolveCentralSchoolId($school);
+
+        if (! $centralTenantId) {
+            throw new \RuntimeException('Unable to resolve tenant mapping in central database.');
+        }
+
+        $latestInfo = $this->getLatestVersionInfo();
+        $latestVersion = trim((string) ($latestInfo['version'] ?? ''));
+
+        if ($latestVersion === '') {
+            throw new \RuntimeException('No latest release version is currently available to sync.');
+        }
+
+        $tenantUpdate = TenantUpdate::query()->firstOrNew(['tenant_id' => $centralTenantId]);
+        $tenantUpdate->fill([
+            'current_version' => $latestVersion,
+            'last_checked_at' => now(),
+            'latest_seen_version' => $latestVersion,
+            'acknowledged_at' => now(),
+        ]);
+        $tenantUpdate->save();
+
+        DB::connection('central')->table('schools')
+            ->where('id', $centralTenantId)
+            ->update([
+                'version' => $latestVersion,
+                'updated_at' => now(),
+            ]);
+
+        // Persist to the tenant DB as well, since "check for updates" reads from the
+        // tenant's current school record (not the central school).
+        $school->forceFill(['version' => $latestVersion])->save();
+
+        return [
+            'version' => $latestVersion,
+            'source' => (string) ($latestInfo['source'] ?? 'unknown'),
+        ];
     }
 
     public function resolveCentralSchoolId(School $tenantSchool): ?int

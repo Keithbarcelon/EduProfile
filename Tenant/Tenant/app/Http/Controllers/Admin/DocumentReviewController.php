@@ -18,7 +18,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use Throwable;
 
 class DocumentReviewController extends Controller
 {
@@ -83,6 +82,16 @@ class DocumentReviewController extends Controller
 
         $students = Student::query()
             ->where('school_id', $schoolId)
+            ->when($user->role === UserRole::ADMISSION->value, fn ($studentQuery) => $studentQuery->where('status_category', 'affirmative'))
+            ->when(in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value], true), function ($studentQuery) use ($user): void {
+                if ($user->department_id === null) {
+                    $studentQuery->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                $studentQuery->where('department_id', $user->department_id);
+            })
             ->with(['department', 'documents:id,student_id,name'])
             ->latest()
             ->get();
@@ -186,9 +195,7 @@ class DocumentReviewController extends Controller
 
     private function applyRoleVisibilityConstraints(Builder $query, User $user): void
     {
-        // If review access was explicitly granted via direct permission assignment,
-        // allow tenant-wide review visibility.
-        if ($this->hasDirectDocumentReviewPermission($user)) {
+        if (UserRole::isAdmin($user->role)) {
             return;
         }
 
@@ -202,18 +209,20 @@ class DocumentReviewController extends Controller
 
         if (in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value], true)) {
             $query->whereHas('student', function (Builder $studentQuery) use ($user): void {
-                $studentQuery->where('status_category', 'probation')
-                    ->where('department_id', $user->department_id ?? 0);
-            });
-        }
-    }
+                if ($user->department_id === null) {
+                    $studentQuery->whereRaw('1 = 0');
 
-    private function hasDirectDocumentReviewPermission(User $user): bool
-    {
-        try {
-            return $user->permissions()->where('slug', 'review_documents')->exists();
-        } catch (Throwable) {
-            return false;
+                    return;
+                }
+
+                $studentQuery->where('department_id', $user->department_id);
+            });
+
+            return;
+        }
+
+        if (! $user->hasPermission('review_documents')) {
+            $query->whereRaw('1 = 0');
         }
     }
 }

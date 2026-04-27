@@ -32,9 +32,13 @@
 
         <div class="admin-panel rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden">
             <div class="px-6 py-5 border-b border-slate-200 flex flex-wrap items-start gap-4">
-                <div class="tenant-primary-soft-bg tenant-primary-text flex h-14 w-14 items-center justify-center rounded-2xl text-xl font-bold shrink-0">
-                    {{ strtoupper(substr($student->first_name, 0, 1) . substr($student->last_name, 0, 1)) }}
-                </div>
+                @if(!empty($student->profile_image_path))
+                    <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($student->profile_image_path) }}" alt="{{ $student->full_name }} photo" class="h-14 w-14 rounded-2xl border border-slate-200 object-cover shrink-0">
+                @else
+                    <div class="tenant-primary-soft-bg tenant-primary-text flex h-14 w-14 items-center justify-center rounded-2xl text-xl font-bold shrink-0">
+                        {{ strtoupper(substr($student->first_name, 0, 1) . substr($student->last_name, 0, 1)) }}
+                    </div>
+                @endif
 
                 <div>
                     <h2 class="text-xl font-bold text-slate-900">{{ $student->full_name }}</h2>
@@ -198,7 +202,7 @@
                                     $fieldLabel = (string) ($field['label'] ?? $fieldKey);
                                     $fieldValue = $fieldKey !== '' ? ($customFieldValueMap[$fieldKey] ?? null) : null;
                                 @endphp
-                                @if($fieldKey !== '' && $fieldValue !== null && trim((string) $fieldValue) !== '')
+                                @if($fieldKey !== '' && strtolower($fieldKey) !== 'student_id' && $fieldValue !== null && trim((string) $fieldValue) !== '')
                                 <div>
                                     <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">{{ $fieldLabel }}</p>
                                     <p class="mt-1 text-sm text-slate-800">{{ $fieldValue }}</p>

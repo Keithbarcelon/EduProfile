@@ -30,7 +30,6 @@ class UpdateStudentRequest extends FormRequest
         $statusCategory = strtolower((string) ($this->input('status_category') ?: $this->route('student')?->status_category ?: 'regular'));
 
         $rules = [
-            'student_id' => ['required', 'string', 'max:20', Rule::unique('students', 'student_id')->ignore($studentId)],
             'user_id' => [
                 'nullable',
                 'integer',
@@ -63,6 +62,7 @@ class UpdateStudentRequest extends FormRequest
             'status' => ['required', 'in:active,inactive,graduated,dropped'],
             'status_category' => ['nullable', 'in:affirmative,probation,regular'],
             'enrolled_at' => ['nullable', 'date'],
+            'profile_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
             'custom_fields' => ['nullable', 'array'],
         ];
 

@@ -34,6 +34,8 @@ class Student extends Model
         'emergency_contact_number',
         'status',
         'status_category',
+        'current_status_id',
+        'profile_image_path',
         'custom_fields',
         'enrolled_at',
     ];
@@ -42,6 +44,7 @@ class Student extends Model
         'school_id'   => 'integer',
         'user_id'     => 'integer',
         'department_id' => 'integer',
+        'current_status_id' => 'integer',
         'birthdate'   => 'date',
         'enrolled_at' => 'date',
         'year_level'  => 'integer',
@@ -73,6 +76,14 @@ class Student extends Model
     }
 
     /**
+     * Get the normalized status reference for this student.
+     */
+    public function currentStatus(): BelongsTo
+    {
+        return $this->belongsTo(Status::class, 'current_status_id');
+    }
+
+    /**
      * Get the remarks recorded for the student.
      */
     public function remarks(): HasMany
@@ -86,6 +97,22 @@ class Student extends Model
     public function statusUpdates(): HasMany
     {
         return $this->hasMany(StatusUpdate::class);
+    }
+
+    /**
+     * Get direct status change history entries for this student.
+     */
+    public function statusHistory(): HasMany
+    {
+        return $this->hasMany(StudentStatusHistory::class);
+    }
+
+    /**
+     * Get document requirement snapshots derived from status changes.
+     */
+    public function documentRequirements(): HasMany
+    {
+        return $this->hasMany(StudentDocumentRequirement::class);
     }
 
     public function customFieldValues(): HasMany

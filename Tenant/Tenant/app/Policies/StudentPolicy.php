@@ -24,7 +24,8 @@ class StudentPolicy
         }
 
         if (in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value])) {
-            return $user->department_id !== null && $user->department_id === $student->department_id;
+            return $user->department_id !== null
+                && $user->department_id === $student->department_id;
         }
 
         return false;
@@ -37,11 +38,11 @@ class StudentPolicy
 
     public function update(User $user, Student $student): bool
     {
-        return $user->hasPermission('manage_students');
+        return $this->view($user, $student);
     }
 
     public function delete(User $user, Student $student): bool
     {
-        return $user->hasPermission('manage_students');
+        return $this->view($user, $student);
     }
 }

@@ -103,4 +103,23 @@ class DocumentController extends Controller
 
         return response()->file(Storage::disk('public')->path($path));
     }
+
+    public function destroy(Document $document): RedirectResponse
+    {
+        $this->authorize('delete', $document);
+
+        if (strtolower((string) $document->status) === 'approved') {
+            return back()->with('error', 'Approved documents cannot be removed.');
+        }
+
+        $path = trim((string) $document->file_path);
+        if ($path !== '' && Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
+
+        $document->delete();
+
+        return redirect()->route('student.documents.index')
+            ->with('success', 'Document removed successfully.');
+    }
 }

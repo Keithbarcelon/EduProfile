@@ -28,7 +28,7 @@ class StoreTenantRequest extends FormRequest
             'address' => ['required', 'string', 'max:500'],
             'email' => ['nullable', 'email', 'max:255'],
             'contact_number' => ['nullable', 'string', 'max:50'],
-            'plan_type' => ['required', Rule::in(['basic', 'pro'])],
+            'plan_type' => ['required', Rule::in(['basic', 'standard', 'premium'])],
             'plan_started_at' => ['nullable', 'date'],
             'plan_due_at' => ['nullable', 'date', 'after_or_equal:plan_started_at'],
             'plan_expiration_email' => ['required', 'email', 'max:255'],

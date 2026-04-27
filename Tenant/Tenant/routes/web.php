@@ -100,6 +100,7 @@ Route::middleware(['auth', 'tenant.active'])->group(function () {
         Route::middleware('module:documents')->group(function () {
             Route::get('/documents', [StudentDocumentController::class, 'index'])->name('documents.index');
             Route::post('/documents', [StudentDocumentController::class, 'store'])->name('documents.store');
+            Route::delete('/documents/{document}', [StudentDocumentController::class, 'destroy'])->name('documents.destroy');
             Route::get('/documents/{document}/download', [StudentDocumentController::class, 'download'])->name('documents.download');
         });
     });
@@ -109,6 +110,7 @@ Route::middleware(['auth', 'tenant.active'])->group(function () {
         Route::post('/check', [SupportUpdatesController::class, 'check'])->name('check');
         Route::post('/check-json', [SupportUpdatesController::class, 'checkJson'])->name('check-json');
         Route::post('/acknowledge', [SupportUpdatesController::class, 'acknowledge'])->name('acknowledge');
+        Route::post('/sync-latest', [SupportUpdatesController::class, 'syncLatest'])->name('sync-latest');
         Route::post('/requests', [SupportUpdatesController::class, 'storeRequest'])->name('requests.store');
     });
 

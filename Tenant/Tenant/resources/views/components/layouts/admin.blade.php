@@ -248,7 +248,7 @@
         {{-- Sidebar Footer / User --}}
         <div class="border-t border-indigo-800/80 px-4 py-4">
             @php
-                $appVersion = (string) config('app.version', 'v1.0.0');
+                $appVersion = (string) (optional($tenantSchool)->version ?: config('app.version', 'v1.0.0'));
                 $releaseUrl = trim((string) config('app.release.github_url', ''));
                 $supportUrl = trim((string) config('app.release.support_url', ''));
                 $supportPageUrl = Route::has('support-updates.index') ? route('support-updates.index') : '';
