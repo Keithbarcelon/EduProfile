@@ -50,6 +50,9 @@ class ReportController extends Controller
             ->when($departmentScopedRole && $departmentId === null, fn ($departmentQuery) => $departmentQuery->whereRaw('1 = 0'))
             ->withCount([
                 'students',
+                'students as regular_count' => fn ($q) => $q->where('status_category', 'regular'),
+                'students as affirmative_count' => fn ($q) => $q->where('status_category', 'affirmative'),
+                'students as probation_count' => fn ($q) => $q->where('status_category', 'probation'),
                 'users as faculty_count' => fn ($departmentQuery) => $departmentQuery->where('role', 'faculty'),
             ])
             ->orderBy('name')
@@ -80,6 +83,32 @@ class ReportController extends Controller
         return view('admin.reports.index', compact('studentStats', 'departmentReports', 'documentCompliance'));
     }
 
+    public function print(Request $request): View
+    {
+        $this->authorize('viewAny', Report::class);
+        $school = app('currentSchool');
+        $user = $request->user();
+        
+        $students = Student::query()
+            ->where('school_id', $school->id)
+            ->with(['department', 'documents'])
+            ->when(in_array($user->role, [UserRole::DEPARTMENT->value, UserRole::FACULTY->value], true), function ($q) use ($user) {
+                return $q->where('department_id', $user->department_id);
+            })
+            ->orderBy('last_name')
+            ->get();
+
+        $departments = Department::query()
+            ->where('school_id', $school->id)
+            ->withCount([
+                'students',
+                'users as faculty_count' => fn($q) => $q->where('role', 'faculty')
+            ])
+            ->get();
+
+        return view('admin.reports.print', compact('school', 'students', 'departments', 'user'));
+    }
+
     public function export(Request $request): StreamedResponse
     {
         $this->authorize('viewFull', Report::class);
@@ -106,24 +135,29 @@ class ReportController extends Controller
 
     private function writeStatusReport($handle, int $schoolId, $user): void
     {
-        fputcsv($handle, ['Status Category', 'Total Students']);
+        fputcsv($handle, ['Student Name', 'Email', 'Status Category', 'Current Status', 'Department', 'Joined Date']);
 
         $query = Student::query()
-            ->where('school_id', $schoolId);
+            ->where('school_id', $schoolId)
+            ->with('department');
 
         $this->applyDepartmentScope($query, $user);
 
-        $query
-            ->selectRaw('status_category, COUNT(*) as total')
-            ->groupBy('status_category')
-            ->orderBy('status_category')
+        $query->orderBy('last_name')
             ->get()
-            ->each(fn ($row) => fputcsv($handle, [$row->status_category, $row->total]));
+            ->each(fn ($student) => fputcsv($handle, [
+                $student->full_name,
+                $student->email,
+                ucfirst($student->status_category),
+                $student->status,
+                $student->department->name ?? 'Unassigned',
+                $student->created_at?->format('Y-m-d') ?? 'N/A',
+            ]));
     }
 
     private function writeDepartmentReport($handle, int $schoolId, $user): void
     {
-        fputcsv($handle, ['Department', 'Students', 'Faculty']);
+        fputcsv($handle, ['Department Name', 'Code', 'Total Students', 'Regular Students', 'Affirmative Students', 'Probation Students', 'Faculty Count']);
 
         $query = Department::query()
             ->where('school_id', $schoolId);
@@ -139,20 +173,27 @@ class ReportController extends Controller
         $query
             ->withCount([
                 'students',
+                'students as regular_count' => fn ($q) => $query->where('status_category', 'regular'),
+                'students as affirmative_count' => fn ($q) => $query->where('status_category', 'affirmative'),
+                'students as probation_count' => fn ($q) => $query->where('status_category', 'probation'),
                 'users as faculty_count' => fn ($query) => $query->where('role', 'faculty'),
             ])
             ->orderBy('name')
             ->get()
-            ->each(fn ($department) => fputcsv($handle, [
-                $department->name,
-                $department->students_count,
-                $department->faculty_count,
+            ->each(fn ($dept) => fputcsv($handle, [
+                $dept->name,
+                $dept->code ?? 'N/A',
+                $dept->students_count,
+                $dept->regular_count,
+                $dept->affirmative_count,
+                $dept->probation_count,
+                $dept->faculty_count,
             ]));
     }
 
     private function writeDocumentReport($handle, int $schoolId, $user): void
     {
-        fputcsv($handle, ['Student', 'Department', 'Document Count', 'Latest Review Status']);
+        fputcsv($handle, ['Student Name', 'Department', 'Document Type', 'Status', 'Submitted At', 'Last Updated']);
 
         $query = Student::query()
             ->where('school_id', $schoolId);
@@ -160,16 +201,31 @@ class ReportController extends Controller
         $this->applyDepartmentScope($query, $user);
 
         $query
-            ->with(['department', 'documents' => fn ($query) => $query->latest()])
+            ->with(['department', 'documents'])
             ->orderBy('last_name')
             ->get()
             ->each(function ($student) use ($handle) {
-                fputcsv($handle, [
-                    $student->full_name,
-                    $student->department->name ?? 'Unassigned',
-                    $student->documents->count(),
-                    $student->documents->first()?->status ?? 'missing',
-                ]);
+                if ($student->documents->isEmpty()) {
+                    fputcsv($handle, [
+                        $student->full_name,
+                        $student->department->name ?? 'Unassigned',
+                        'N/A',
+                        'Missing',
+                        'N/A',
+                        'N/A',
+                    ]);
+                } else {
+                    foreach ($student->documents as $doc) {
+                        fputcsv($handle, [
+                            $student->full_name,
+                            $student->department->name ?? 'Unassigned',
+                            $doc->document_type ?? 'Document',
+                            ucfirst($doc->status),
+                            $doc->created_at?->format('Y-m-d H:i') ?? 'N/A',
+                            $doc->updated_at?->format('Y-m-d H:i') ?? 'N/A',
+                        ]);
+                    }
+                }
             });
     }
 

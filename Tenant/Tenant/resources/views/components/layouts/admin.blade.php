@@ -121,11 +121,55 @@
             background-color: color-mix(in srgb, var(--tenant-primary) 65%, black);
             color: #fff;
         }
+
+        #sidebar {
+            height: 100vh; /* Fallback for some browsers */
+            height: 100dvh;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Main Area Scrollbar */
+        .main-scrollbar::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .main-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .main-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(100, 116, 139, 0.2);
+            border-radius: 10px;
+        }
+
+        .main-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 116, 139, 0.4);
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
     </style>
 </head>
 <body class="admin-shell antialiased bg-slate-100 text-slate-900" style="--tenant-primary: {{ $brandPrimary }}; --tenant-accent: {{ $brandAccent }};">
 
-<div class="relative flex min-h-screen overflow-hidden">
+<div class="relative flex min-h-screen">
     <div class="pointer-events-none absolute inset-0">
         <div class="absolute -top-20 -right-10 h-72 w-72 rounded-full bg-cyan-200/40 blur-3xl"></div>
         <div class="absolute top-40 -left-24 h-80 w-80 rounded-full bg-indigo-200/35 blur-3xl"></div>
@@ -136,14 +180,14 @@
         <div id="sidebarBackdrop" class="fixed inset-0 z-30 hidden bg-slate-900/40 lg:hidden"></div>
 
         <aside id="sidebar"
-            class="tenant-sidebar fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col text-white shadow-2xl transition-transform duration-300 ease-out lg:static lg:z-auto lg:translate-x-0 lg:shadow-none">
+            class="tenant-sidebar fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col text-white shadow-2xl transition-transform duration-300 ease-out lg:sticky lg:top-0 lg:h-screen lg:z-auto lg:translate-x-0 lg:shadow-none">
 
         {{-- Logo --}}
         @php
             $currentSchool = app('currentSchool');
             $hasTenantLogo = $currentSchool && filled($currentSchool->logo_path);
         @endphp
-        <div class="flex items-center gap-3 border-b border-indigo-800/80 px-6 py-5">
+        <div class="flex items-center gap-3 border-b border-indigo-800/80 px-6 py-5 shrink-0">
             @if($hasTenantLogo)
             <img
                 src="{{ route('tenant.logo', ['v' => optional($currentSchool->updated_at)->timestamp]) }}"
@@ -162,14 +206,14 @@
         </div>
 
         {{-- Role Badge --}}
-        <div class="border-b border-indigo-800/80 px-6 py-3">
+        <div class="border-b border-indigo-800/80 px-6 py-3 shrink-0">
             <span class="inline-flex items-center rounded-full bg-indigo-700/80 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-indigo-100 ring-1 ring-indigo-400/40">
                 {{ $role ?? 'Admin' }}
             </span>
         </div>
 
         {{-- Navigation --}}
-        <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar">
 
             @php
                 $user = auth()->user();
@@ -246,7 +290,7 @@
         </nav>
 
         {{-- Sidebar Footer / User --}}
-        <div class="border-t border-indigo-800/80 px-4 py-4">
+        <div class="border-t border-indigo-800/80 px-4 py-4 shrink-0">
             @php
                 $appVersion = (string) (optional($tenantSchool)->version ?: config('app.version', 'v1.0.0'));
                 $releaseUrl = trim((string) config('app.release.github_url', ''));
@@ -299,10 +343,10 @@
     </aside>
 
     {{-- ===================== MAIN AREA ===================== --}}
-    <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+    <div class="flex min-w-0 flex-1 flex-col">
 
         {{-- ===================== TOP NAVBAR ===================== --}}
-        <header class="flex h-16 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/85 px-4 shadow-sm backdrop-blur sm:px-6">
+        <header class="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/85 px-4 shadow-sm backdrop-blur sm:px-6">
 
             {{-- Left: Hamburger + Page Title --}}
             <div class="flex items-center gap-4">
@@ -328,18 +372,6 @@
 
             {{-- Right: Actions + User --}}
             <div class="flex items-center gap-3">
-
-                {{-- Notifications --}}
-                <button class="relative rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                    </svg>
-                    <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
-                </button>
-
-                {{-- Divider --}}
-                <div class="h-6 w-px bg-slate-200"></div>
 
                 {{-- User dropdown --}}
                 <div class="relative" x-data="{ open: false }">
@@ -383,7 +415,7 @@
         </header>
 
         {{-- ===================== CONTENT ===================== --}}
-        <main class="relative z-10 flex-1 overflow-y-auto p-4 sm:p-6">
+        <main class="relative z-10 flex-1 p-4 sm:p-6 main-scrollbar">
             {{-- Flash Messages --}}
             @if(!($suppressFlash ?? false) && session('success'))
             <div class="mb-4 flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">

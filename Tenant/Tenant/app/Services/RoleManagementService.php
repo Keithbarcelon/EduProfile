@@ -154,7 +154,6 @@ class RoleManagementService
             'tenant_admin',
             'admin',
             'admission',
-            'department',
             'faculty',
             'student',
         ];

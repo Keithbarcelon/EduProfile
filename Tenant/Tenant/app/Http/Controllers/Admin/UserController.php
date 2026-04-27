@@ -200,7 +200,6 @@ class UserController extends Controller
     {
         return [
             UserRole::ADMISSION->value,
-            UserRole::DEPARTMENT->value,
             UserRole::FACULTY->value,
             UserRole::STUDENT->value,
         ];
@@ -270,7 +269,6 @@ class UserController extends Controller
             'admin' => 'tenant-admin',
             'tenant_admin' => 'tenant-admin',
             'admission' => 'admission',
-            'department' => 'department',
             'faculty' => 'faculty',
             'student' => 'student',
         ];

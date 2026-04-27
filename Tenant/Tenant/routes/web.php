@@ -60,6 +60,7 @@ Route::middleware(['auth', 'tenant.active'])->group(function () {
 
         Route::middleware(['permission:view_reports', 'module:reports'])->group(function () {
             Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+            Route::get('/reports/print', [ReportController::class, 'print'])->name('reports.print');
             Route::post('/reports/export', [ReportController::class, 'export'])->name('reports.export');
         });
 

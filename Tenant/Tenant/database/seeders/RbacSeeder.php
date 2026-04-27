@@ -39,7 +39,6 @@ class RbacSeeder extends Seeder
         $rolePermissionMap = [
             'tenant-admin' => ['manage_students', 'view_reports', 'manage_users', 'manage_departments', 'manage_settings', 'manage_status_updates', 'review_documents', 'manage_profiles', 'manage_tenant', 'manage_roles', 'manage_support'],
             'admission' => ['manage_students', 'view_reports', 'manage_status_updates', 'review_documents'],
-            'department' => ['manage_students', 'view_reports', 'manage_status_updates', 'review_documents'],
             'faculty' => ['manage_students', 'manage_status_updates', 'review_documents'],
             'student' => [],
         ];
@@ -68,7 +67,6 @@ class RbacSeeder extends Seeder
             'admin' => 'tenant-admin',
             'tenant_admin' => 'tenant-admin',
             'admission' => 'admission',
-            'department' => 'department',
             'faculty' => 'faculty',
             'student' => 'student',
         ];

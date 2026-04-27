@@ -30,7 +30,7 @@
                 <option value="{{ $role }}">{{ \App\Enums\UserRole::labels()[$role] }}</option>
                 @endforeach
             </select>
-            <p class="mt-1 text-xs text-slate-500">Available roles: admission, department, faculty, student.</p>
+            <p class="mt-1 text-xs text-slate-500">Available roles: admission, faculty, student.</p>
             @error('role') <p class="mt-1 text-sm text-red-600">{{ $message }}</p> @enderror
         </div>
 

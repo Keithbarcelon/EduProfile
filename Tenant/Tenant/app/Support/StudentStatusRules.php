@@ -19,6 +19,7 @@ class StudentStatusRules
 
         return match ($normalizedRole) {
             UserRole::ADMISSION->value => ['affirmative'],
+            UserRole::DEPARTMENT->value,
             UserRole::FACULTY->value => ['probation'],
             default => [],
         };
