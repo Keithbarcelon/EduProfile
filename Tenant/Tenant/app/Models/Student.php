@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Traits\BelongsToSchool;
+use App\Traits\HasDepartmentScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Student extends Model
 {
-    use BelongsToSchool;
+    use BelongsToSchool, HasDepartmentScope;
 
     protected $fillable = [
         'school_id',
@@ -96,6 +97,18 @@ class Student extends Model
     public function statusUpdates(): HasMany
     {
         return $this->hasMany(StatusUpdate::class);
+    }
+
+    /**
+     * Get the global document requirements applicable to this student's status.
+     */
+    public function applicableRequirements(): HasMany
+    {
+        return $this->hasMany(DocumentRequirement::class, 'school_id', 'school_id')
+            ->where(function ($query) {
+                $query->where('applicable_status', 'all')
+                    ->orWhere('applicable_status', $this->status);
+            });
     }
 
     /**

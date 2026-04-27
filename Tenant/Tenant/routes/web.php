@@ -53,6 +53,9 @@ Route::middleware(['auth', 'tenant.active'])->group(function () {
 
         Route::middleware(['permission:review_documents', 'module:documents'])->group(function () {
             Route::get('/document-reviews', [DocumentReviewController::class, 'index'])->name('documents.index');
+            Route::get('/document-requirements', function () {
+                return view('admin.documents.requirements');
+            })->name('documents.requirements');
             Route::get('/documents/{document}/view', [DocumentReviewController::class, 'view'])->name('documents.view');
             Route::post('/documents/{document}/approve', [DocumentReviewController::class, 'approve'])->name('documents.approve');
             Route::post('/documents/{document}/reject', [DocumentReviewController::class, 'reject'])->name('documents.reject');

@@ -3,23 +3,23 @@ import './bootstrap';
 import Alpine from 'alpinejs';
 import { createApp } from 'vue';
 import SetStudentStatusModal from './components/SetStudentStatusModal.vue';
+import DocumentRequirementSettings from './components/DocumentRequirementSettings.vue';
+import StudentDocumentUpload from './components/StudentDocumentUpload.vue';
+import DocumentReview from './components/DocumentReview.vue';
 
 window.Alpine = Alpine;
 
 Alpine.start();
 
-const statusMount = document.getElementById('set-student-status-app');
+// Component Registration Helper
+const mountComponent = (id, component, props = {}) => {
+    const el = document.getElementById(id);
+    if (el) {
+        createApp(component, { ...props, ...el.dataset }).mount(`#${id}`);
+    }
+};
 
-if (statusMount) {
-	const students = JSON.parse(statusMount.dataset.students || '[]');
-	const allowedStatuses = JSON.parse(statusMount.dataset.allowedStatuses || '[]');
-	const roleLabel = statusMount.dataset.roleLabel || 'Staff';
-	const endpointTemplate = statusMount.dataset.endpointTemplate || '/api/students/__STUDENT_ID__/status';
-
-	createApp(SetStudentStatusModal, {
-		students,
-		allowedStatuses,
-		roleLabel,
-		endpointTemplate,
-	}).mount('#set-student-status-app');
-}
+mountComponent('set-student-status-app', SetStudentStatusModal);
+mountComponent('document-requirement-settings-app', DocumentRequirementSettings);
+mountComponent('student-document-upload-app', StudentDocumentUpload);
+mountComponent('document-review-app', DocumentReview);
